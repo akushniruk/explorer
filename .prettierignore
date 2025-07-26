@@ -1,0 +1,15 @@
+# Build artifacts
+dist
+build
+coverage
+
+# Dependencies
+node_modules
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Log files
+*.log
