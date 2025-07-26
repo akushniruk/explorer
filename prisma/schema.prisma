@@ -1,3 +1,7 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DIRECT_URL")
@@ -73,4 +77,12 @@ model RpcStore {
   res_sig   String[] @db.Text
 
   @@map("rpc_store")
+}
+
+model WorkerState {
+  id                     String   @id
+  lastProcessedTimestamp BigInt
+  updated_at             DateTime @updatedAt
+
+  @@map("worker_states")
 }
