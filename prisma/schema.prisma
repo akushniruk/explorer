@@ -1,0 +1,76 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+model Channel {
+  channel_id  String   @id
+  chain_id    BigInt
+  token       String
+  wallet      String
+  participant String
+  amount      BigInt
+  status      String
+  challenge   BigInt   @default(0)
+  nonce       BigInt   @default(0)
+  version     BigInt   @default(0)
+  adjudicator String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@map("channels")
+}
+
+model Asset {
+  token    String
+  chain_id BigInt
+  symbol   String
+  decimals BigInt
+
+  @@id([token, chain_id])
+  @@map("assets")
+}
+
+model Ledger {
+  id           Int      @id @default(autoincrement())
+  account_id   String
+  account_type String
+  asset_symbol String
+  wallet       String
+  credit       Decimal  @db.Decimal(64, 18)
+  debit        Decimal  @db.Decimal(64, 18)
+  created_at   DateTime @default(now())
+
+  @@map("ledgers")
+}
+
+model AppSession {
+  id           Int      @id @default(autoincrement())
+  protocol     String   @default("NitroRPC/0.2")
+  session_id   String   @unique
+  channel_id   BigInt
+  nonce        BigInt
+  participants String[]
+  weight       Int[]
+  quorum       BigInt   @default(100)
+  version      BigInt   @default(1)
+  status       String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
+
+  @@map("app_sessions")
+}
+
+model RpcStore {
+  id        Int      @id @default(autoincrement())
+  sender    String   @db.VarChar(255)
+  req_id    BigInt
+  method    String   @db.VarChar(255)
+  params    String   @db.Text
+  timestamp BigInt
+  req_sig   String[] @db.Text
+  response  String   @db.Text
+  res_sig   String[] @db.Text
+
+  @@map("rpc_store")
+}
