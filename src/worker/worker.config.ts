@@ -10,6 +10,9 @@ export default registerAs('worker', () => ({
     fullSleepMs: Number(process.env.SYNC_FULL_SLEEP_MS ?? 3_000),
     channelsLimit: Number(process.env.SYNC_CHANNELS_LIMIT ?? 100),
     assetsRefreshMs: Number(process.env.SYNC_ASSETS_REFRESH_MS ?? 30 * 60 * 1000),
+    appSessionsPageSize: Number(process.env.SYNC_APP_SESSIONS_PAGE_SIZE ?? 100),
+    appSessionsBudgetMs: Number(process.env.SYNC_APP_SESSIONS_BUDGET_MS ?? 10_000),
+    appSessionsRefreshMs: Number(process.env.SYNC_APP_SESSIONS_REFRESH_MS ?? 5 * 60 * 1000),
   },
   tx: {
     pageSize: Number(process.env.SYNC_TXS_PAGE_SIZE ?? 200),

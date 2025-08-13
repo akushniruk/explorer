@@ -9,6 +9,7 @@ import workerCfg from './worker.config';
 import { ConfigType } from '@nestjs/config';
 import { AssetService } from './asset/asset.service';
 import { HealthService } from './health/health.service';
+import { AppSessionService } from './app-session/app-session.service';
 
 const WORKER_STATE_KEY = 'channels:last_ts';
 const JOB_ID = 'channels-sync';
@@ -37,6 +38,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
   private isInitialSyncComplete = false;
   private isSyncing = false;
   private lastAssetsSyncMs = 0;
+  private lastAppSessionsSyncMs = 0;
 
   constructor(
     private readonly yellowApiService: YellowApiService,
@@ -46,6 +48,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly scheduler: SchedulerRegistry,
     private readonly assetService: AssetService,
     private readonly healthService: HealthService,
+    private readonly appSessionService: AppSessionService,
     @Inject(workerCfg.KEY) private readonly cfg: ConfigType<typeof workerCfg>,
   ) {}
 
@@ -81,6 +84,15 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Initial assets warm-up done', { count: res.count });
     } catch (e) {
       this.logger.warn(`Initial assets warm-up failed: ${(e as Error).message}`);
+    }
+
+    try {
+      const res = await this.appSessionService.syncAllWithBudget();
+
+      this.lastAppSessionsSyncMs = Date.now();
+      this.logger.log('Initial app sessions warm-up done', { count: res.count });
+    } catch (e) {
+      this.logger.warn(`Initial app sessions warm-up failed: ${(e as Error).message}`);
     }
 
     // Load persisted cursor (composite)
@@ -122,18 +134,34 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const assetsRefreshMs = Number(this.cfg?.sync?.assetsRefreshMs ?? 30 * 60 * 1000); // 30m
 
     const health = await this.healthService.check();
+
     if (health.status !== 'healthy') {
       this.logger.warn('Skipping sync: upstream unhealthy', { latencyMs: health.latencyMs });
+
       return;
     }
 
     if (Date.now() - this.lastAssetsSyncMs >= assetsRefreshMs) {
       try {
         const res = await this.assetService.syncAssets();
+
         this.lastAssetsSyncMs = Date.now();
         this.logger.log('Periodic assets refresh completed', { count: res.count });
       } catch (e) {
         this.logger.warn(`Periodic assets refresh failed: ${(e as Error).message}`);
+      }
+    }
+
+    const ttl = Number(this.cfg?.sync?.appSessionsRefreshMs ?? 300_000);
+
+    if (Date.now() - this.lastAppSessionsSyncMs >= ttl) {
+      try {
+        const res = await this.appSessionService.syncAllWithBudget();
+
+        this.lastAppSessionsSyncMs = Date.now();
+        this.logger.log('Periodic app sessions refresh completed', { count: res.count });
+      } catch (e) {
+        this.logger.warn(`Periodic app sessions refresh failed: ${(e as Error).message}`);
       }
     }
 
@@ -353,7 +381,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
           lastProcessedTimestamp: BigInt(c.t),
           cursor: encodeCursor(c),
         },
-      } as any);
+      });
     } catch (e) {
       this.logger.warn(`Failed to persist worker state: ${(e as Error).message}`);
     }

@@ -10,6 +10,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import workerConfig from './worker.config';
 import { envValidationSchema } from '../config/env.validation';
 import { HealthService } from './health/health.service';
+import { AppSessionService } from './app-session/app-session.service';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthService } from './health/health.service';
     AssetService,
     HealthService,
     NodeConfigService,
+    AppSessionService,
   ],
 })
 export class WorkerModule {}
