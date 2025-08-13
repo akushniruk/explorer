@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { YellowApiService } from './yellow-api.service';
-import { ChannelService } from './channel/channel.service'; // <-- Import ChannelService
+import { ChannelService } from './channel/channel.service';
 import { GetChannelsResponseParams } from '@erc7824/nitrolite';
 
 @Injectable()
@@ -13,18 +13,26 @@ export class WorkerService implements OnModuleInit {
 
   constructor(
     private readonly yellowApiService: YellowApiService,
-    private readonly channelService: ChannelService, // <-- Inject ChannelService
+    private readonly channelService: ChannelService,
   ) {}
 
   async onModuleInit() {
-    this.logger.log('WorkerService initialized. Starting initial sync immediately.');
+    this.logger.log('Worker service initialized successfully', {
+      component: 'WorkerService',
+      action: 'startup',
+      syncInterval: '90s',
+    });
     await this.handleSync();
   }
 
-  @Interval(60000)
+  @Interval(90000)
   async handleSync(): Promise<void> {
     if (this.isSyncing) {
-      this.logger.warn('Sync already in progress. Skipping this interval.');
+      this.logger.warn('Sync operation already in progress, skipping scheduled interval', {
+        component: 'WorkerService',
+        operation: 'sync',
+        interval: '90s',
+      });
 
       return;
     }
@@ -38,17 +46,29 @@ export class WorkerService implements OnModuleInit {
         await this.runIncrementalSync();
       }
     } catch (error) {
-      this.logger.error('An error occurred during the sync process.', error);
+      this.logger.error('Channel synchronization failed', {
+        component: 'WorkerService',
+        operation: this.isInitialSyncComplete ? 'incremental_sync' : 'full_sync',
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      });
     } finally {
       this.isSyncing = false;
     }
   }
 
   private async runFullSync(): Promise<void> {
-    this.logger.log('Starting initial full sync of all channels...');
+    const startTime = Date.now();
+
+    this.logger.log('Started full channel synchronization', {
+      operation: 'full_sync',
+      batchSize: 100,
+      startTime: new Date().toISOString(),
+    });
     let offset = 0;
     const limit = 100;
     let newestTimestampInSync: Date | null = null;
+    let totalChannelsProcessed = 0;
 
     while (true) {
       const response = await this.yellowApiService.getChannels({
@@ -64,8 +84,8 @@ export class WorkerService implements OnModuleInit {
         newestTimestampInSync = new Date(channels[0].createdAt);
       }
 
-      // Delegate processing to the ChannelService
       await this.channelService.processChannels(channels);
+      totalChannelsProcessed += channels.length;
 
       if (channels.length < limit) break;
 
@@ -73,11 +93,17 @@ export class WorkerService implements OnModuleInit {
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
+    const duration = Date.now() - startTime;
+
     this.latestKnownChannelTimestamp = newestTimestampInSync;
     this.isInitialSyncComplete = true;
-    this.logger.log(
-      `Initial sync complete. Newest channel: ${this.latestKnownChannelTimestamp?.toISOString()}`,
-    );
+    this.logger.log('Full channel synchronization completed', {
+      operation: 'full_sync',
+      channelsProcessed: totalChannelsProcessed,
+      duration: `${duration}ms`,
+      latestChannelDate: this.latestKnownChannelTimestamp?.toISOString(),
+      timestamp: new Date().toISOString(),
+    });
   }
 
   private async runIncrementalSync(): Promise<void> {
@@ -85,14 +111,25 @@ export class WorkerService implements OnModuleInit {
     const limit = 100;
 
     if (!this.latestKnownChannelTimestamp) {
-      this.logger.error('Cannot run incremental sync: initial sync must complete first.');
+      this.logger.error('Incremental sync prerequisite not met', {
+        component: 'WorkerService',
+        operation: 'incremental_sync',
+        error: 'Initial sync must complete first',
+        isInitialSyncComplete: this.isInitialSyncComplete,
+      });
 
       return;
     }
 
     const lastSyncTimestamp = this.latestKnownChannelTimestamp;
 
-    this.logger.log('Checking for new channels...');
+    const startTime = Date.now();
+
+    this.logger.log('Started incremental channel synchronization', {
+      operation: 'incremental_sync',
+      lastSyncDate: lastSyncTimestamp.toISOString(),
+      startTime: new Date().toISOString(),
+    });
     const allNewChannels: GetChannelsResponseParams = [];
 
     while (true) {
@@ -110,12 +147,24 @@ export class WorkerService implements OnModuleInit {
       offset += limit;
     }
 
+    const duration = Date.now() - startTime;
+
     if (allNewChannels.length > 0) {
-      this.logger.log(`Found ${allNewChannels.length} new channels.`);
+      this.logger.log('Incremental channel synchronization completed', {
+        operation: 'incremental_sync',
+        newChannels: allNewChannels.length,
+        duration: `${duration}ms`,
+        latestChannelDate: new Date(allNewChannels[0].createdAt).toISOString(),
+      });
       this.latestKnownChannelTimestamp = new Date(allNewChannels[0].createdAt);
       await this.channelService.processChannels(allNewChannels);
     } else {
-      this.logger.log('No new channels found.');
+      this.logger.log('Incremental synchronization completed with no new channels', {
+        operation: 'incremental_sync',
+        newChannels: 0,
+        duration: `${duration}ms`,
+        lastCheckedDate: lastSyncTimestamp.toISOString(),
+      });
     }
   }
 }

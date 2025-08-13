@@ -39,16 +39,36 @@ export class YellowApiService implements OnModuleInit {
 
   private connect(): void {
     if (!this.WORKER_URL) {
-      this.logger.error('Yellow API URL is not defined');
+      this.logger.error('Yellow API configuration missing', {
+        component: 'YellowApiService',
+        error: 'YELLOW_API_URL environment variable not defined',
+        action: 'connection_failed',
+      });
 
       return;
     }
 
-    this.logger.log(`Connecting to Yellow API at ${this.WORKER_URL}...`);
+    this.logger.log('Initiating Yellow API WebSocket connection', {
+      component: 'YellowApiService',
+      url: this.WORKER_URL,
+      protocol: 'ws',
+    });
     this.ws = new WebSocket(this.WORKER_URL);
-    this.ws.on('open', () => this.logger.log('Successfully connected to Yellow API.'));
+    this.ws.on('open', () =>
+      this.logger.log('WebSocket connection established', {
+        component: 'YellowApiService',
+        url: this.WORKER_URL,
+        status: 'connected',
+      }),
+    );
     this.ws.on('message', (data: WebSocket.Data) => this.handleMessage(String(data)));
-    this.ws.on('error', (error) => this.logger.error(`WebSocket error: ${error.message}`));
+    this.ws.on('error', (error) =>
+      this.logger.error('WebSocket connection error', {
+        component: 'YellowApiService',
+        error: error.message,
+        url: this.WORKER_URL,
+      }),
+    );
     this.ws.on('close', () => this.handleDisconnection());
   }
 
@@ -56,7 +76,12 @@ export class YellowApiService implements OnModuleInit {
     this.reconnectAttempts++;
     const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 60000);
 
-    this.logger.warn(`Connection closed. Reconnecting in ${delay / 1000}s...`);
+    this.logger.warn('WebSocket connection lost, initiating reconnection', {
+      component: 'YellowApiService',
+      reconnectAttempt: this.reconnectAttempts,
+      nextRetryIn: `${delay / 1000}s`,
+      pendingRequests: this.pendingRequests.size,
+    });
     this.pendingRequests.clear();
     setTimeout(() => this.connect(), delay);
   }
@@ -72,7 +97,11 @@ export class YellowApiService implements OnModuleInit {
       const requestId = response.requestId;
 
       if (!method || requestId === undefined) {
-        this.logger.warn('Received message without a valid method or request ID', rawData);
+        this.logger.warn('Invalid message received from Yellow API', {
+          component: 'YellowApiService',
+          issue: 'Missing method or request ID',
+          messageLength: rawData.length,
+        });
 
         return;
       }
@@ -92,8 +121,12 @@ export class YellowApiService implements OnModuleInit {
           //   break;
           // }
           default:
-            // Fallback for methods you don't have a specific case for yet.
-            this.logger.warn(`No specific parser case for method: ${method}.`);
+            this.logger.warn('Unhandled RPC method received', {
+              component: 'YellowApiService',
+              method: method,
+              requestId: requestId,
+              fallbackParser: 'parseAnyRPCResponse',
+            });
             response = parseAnyRPCResponse(rawData);
             break;
         }
@@ -110,18 +143,27 @@ export class YellowApiService implements OnModuleInit {
           resolver(response);
           this.pendingRequests.delete(requestId);
         } else {
-          this.logger.error(
-            `Could not find resolver for request ID ${requestId}, though it was expected.`,
-          );
+          this.logger.error('Request resolver not found', {
+            component: 'YellowApiService',
+            requestId: requestId,
+            method: method,
+            issue: 'Missing resolver for expected request',
+          });
         }
       } else {
-        // This is for broadcast/stream messages that we didn't explicitly request.
-        this.logger.log(`Received unhandled message/stream update: ${method}`);
+        this.logger.debug('Received broadcast message from Yellow API', {
+          component: 'YellowApiService',
+          method: method,
+          type: 'stream_update',
+          requestId: requestId,
+        });
       }
     } catch (error) {
-      this.logger.error('Failed to handle incoming message', {
+      this.logger.error('Message processing failed', {
+        component: 'YellowApiService',
         error: error instanceof Error ? error.message : String(error),
-        rawData,
+        messageLength: rawData.length,
+        operation: 'handle_message',
       });
     }
   }
@@ -141,9 +183,12 @@ export class YellowApiService implements OnModuleInit {
       throw new Error('Invalid message format received from SDK');
     }
 
-    // 2. **THE PATCH**: If pagination options are provided, inject them.
     if (paginationOptions) {
-      this.logger.log(`Patching request with pagination: ${JSON.stringify(paginationOptions)}`);
+      this.logger.debug('Applying pagination to RPC request', {
+        component: 'YellowApiService',
+        requestId: message.req[0],
+        pagination: paginationOptions,
+      });
 
       if (message.req[2] && typeof message.req[2][0] === 'object') {
         Object.assign(message.req[2][0], paginationOptions);
@@ -153,16 +198,27 @@ export class YellowApiService implements OnModuleInit {
     const finalRequestJson = JSON.stringify(message);
     const requestId = message.req[0];
 
-    this.logger.log(`Sending request ${finalRequestJson}`);
+    this.logger.debug('Sending RPC request to Yellow API', {
+      component: 'YellowApiService',
+      requestId: requestId,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      method: (message as any).method || 'unknown',
+      messageSize: finalRequestJson.length,
+    });
     const promise = new Promise<RPCResponse>((resolve, reject) => {
       this.pendingRequests.set(requestId, resolve);
-      // Add a timeout to prevent requests from hanging forever
       setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
-          reject(new Error(`Request ${requestId} timed out after 30 seconds.`));
+          this.logger.error('RPC request timeout', {
+            component: 'YellowApiService',
+            requestId: requestId,
+            timeout: '90s',
+            operation: 'send_request',
+          });
+          reject(new Error(`Request ${requestId} timed out after 90 seconds.`));
         }
-      }, 60000);
+      }, 90000);
     });
 
     this.ws.send(finalRequestJson);

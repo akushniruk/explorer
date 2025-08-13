@@ -11,7 +11,14 @@ export class ChannelService {
   public async processChannels(channels: GetChannelsResponseParams): Promise<void> {
     if (!channels || channels.length === 0) return;
 
-    this.logger.log(`Processing and saving ${channels.length} channels...`);
+    const startTime = Date.now();
+
+    this.logger.log('Processing channel batch', {
+      component: 'ChannelService',
+      operation: 'process_channels',
+      batchSize: channels.length,
+      startTime: new Date().toISOString(),
+    });
 
     for (const channel of channels) {
       const dataToUpsert = {
@@ -28,9 +35,12 @@ export class ChannelService {
         version: channel.version,
       };
 
-      this.logger.log(
-        `Upserting channel ${dataToUpsert.channel_id} with status ${dataToUpsert.status}`,
-      );
+      this.logger.debug('Processing individual channel', {
+        component: 'ChannelService',
+        channelId: dataToUpsert.channel_id,
+        status: dataToUpsert.status,
+        participant: dataToUpsert.participant,
+      });
 
       await this.prisma.channel.upsert({
         where: { channel_id: dataToUpsert.channel_id },
@@ -39,6 +49,14 @@ export class ChannelService {
       });
     }
 
-    this.logger.log(`Successfully saved batch of ${channels.length} channels.`);
+    const duration = Date.now() - startTime;
+
+    this.logger.log('Channel batch processing completed', {
+      component: 'ChannelService',
+      operation: 'process_channels',
+      batchSize: channels.length,
+      duration: `${duration}ms`,
+      averagePerChannel: `${Math.round(duration / channels.length)}ms`,
+    });
   }
 }
