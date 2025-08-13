@@ -53,13 +53,15 @@ model AppSession {
   id           Int      @id @default(autoincrement())
   protocol     String   @default("NitroRPC/0.2")
   session_id   String   @unique
-  channel_id   BigInt
+  channel_id   String
   nonce        BigInt
   participants String[]
   weight       Int[]
   quorum       BigInt   @default(100)
   version      BigInt   @default(1)
   status       String
+  challenge    BigInt?
+  session_data String?
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now()) @updatedAt
 
