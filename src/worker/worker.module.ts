@@ -9,6 +9,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import workerConfig from './worker.config';
 import { envValidationSchema } from '../config/env.validation';
+import { HealthService } from './health/health.service';
 
 @Module({
   imports: [
@@ -26,6 +27,13 @@ import { envValidationSchema } from '../config/env.validation';
       },
     }),
   ],
-  providers: [WorkerService, YellowApiService, ChannelService, AssetService, NodeConfigService],
+  providers: [
+    WorkerService,
+    YellowApiService,
+    ChannelService,
+    AssetService,
+    HealthService,
+    NodeConfigService,
+  ],
 })
 export class WorkerModule {}

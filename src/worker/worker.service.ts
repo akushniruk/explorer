@@ -8,6 +8,7 @@ import { NodeConfigService } from './node-config/node-config.service';
 import workerCfg from './worker.config';
 import { ConfigType } from '@nestjs/config';
 import { AssetService } from './asset/asset.service';
+import { HealthService } from './health/health.service';
 
 const WORKER_STATE_KEY = 'channels:last_ts';
 const JOB_ID = 'channels-sync';
@@ -44,6 +45,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly nodeConfigService: NodeConfigService,
     private readonly scheduler: SchedulerRegistry,
     private readonly assetService: AssetService,
+    private readonly healthService: HealthService,
     @Inject(workerCfg.KEY) private readonly cfg: ConfigType<typeof workerCfg>,
   ) {}
 
@@ -61,6 +63,16 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     // Force a real config fetch on boot (persists to DB)
     await this.nodeConfigService.warm({ forceFetch: true });
+
+    try {
+      const h = await this.healthService.check();
+
+      if (h.status === 'down') {
+        this.logger.warn('Upstream is down at boot; warm-ups may fail', { latencyMs: h.latencyMs });
+      }
+    } catch {
+      /* noop */
+    }
 
     try {
       const res = await this.assetService.syncAssets(); // all chains
@@ -108,6 +120,12 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
   async handleSync(): Promise<void> {
     const assetsRefreshMs = Number(this.cfg?.sync?.assetsRefreshMs ?? 30 * 60 * 1000); // 30m
+
+    const health = await this.healthService.check();
+    if (health.status !== 'healthy') {
+      this.logger.warn('Skipping sync: upstream unhealthy', { latencyMs: health.latencyMs });
+      return;
+    }
 
     if (Date.now() - this.lastAssetsSyncMs >= assetsRefreshMs) {
       try {

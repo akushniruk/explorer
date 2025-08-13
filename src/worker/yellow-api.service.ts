@@ -13,6 +13,7 @@ import {
   GetAssetsResponse,
   rpcResponseParser,
   parseAnyRPCResponse,
+  createPingMessage,
 } from '@erc7824/nitrolite';
 import workerCfg from './worker.config';
 import { ConfigType } from '@nestjs/config';
@@ -87,6 +88,10 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- Public RPCs ----------
+
+  public async ping(): Promise<void> {
+    await this.sendRequest<RPCMethod.Pong>((s) => createPingMessage(s), RPCMethod.Pong);
+  }
 
   public async getAssets(chainId?: number): Promise<GetAssetsResponse> {
     return this.sendRequest<RPCMethod.GetAssets>(
@@ -224,6 +229,9 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
           break;
         case RPCMethod.GetAssets:
           response = rpcResponseParser.getAssets(rawData);
+          break;
+        case RPCMethod.Pong:
+          response = anyResp;
           break;
         default:
           this.logger.warn('Unhandled RPC method received', {
