@@ -87,7 +87,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // Handle standard NestJS HTTP exceptions
     if (exception instanceof HttpException) {
       const response = exception.getResponse();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       const message =
         typeof response === 'string' ? response : (response as any).message || exception.message;
 
@@ -95,7 +95,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         success: false,
         error: {
           code: this.getErrorCodeFromHttpStatus(exception.getStatus()),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
           message: Array.isArray(message) ? message.join(', ') : message,
 
           details: typeof response === 'object' ? response : undefined,

@@ -19,7 +19,7 @@ export class BaseApiException extends HttpException {
       error: {
         code: this.errorCode,
         message: this.message,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         details: this.details,
         field: this.field,
         timestamp: new Date().toISOString(),

@@ -1,13 +1,31 @@
 import { Module } from '@nestjs/common';
 import { WorkerService } from './worker.service';
 import { YellowApiService } from './yellow-api.service';
-import { PrismaModule } from '../prisma/prisma.module'; // Assuming you have a PrismaModule
-import { ScheduleModule } from '@nestjs/schedule';
+import { PrismaModule } from '../prisma/prisma.module';
 import { ChannelService } from './channel/channel.service';
 import { AssetService } from './asset/asset.service';
+import { NodeConfigService } from './node-config/node-config.service';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import workerConfig from './worker.config';
+import { envValidationSchema } from '../config/env.validation';
 
 @Module({
-  imports: [PrismaModule, ScheduleModule.forRoot()],
-  providers: [WorkerService, YellowApiService, ChannelService, AssetService],
+  imports: [
+    PrismaModule,
+    ScheduleModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [workerConfig],
+      validationSchema: envValidationSchema,
+      validationOptions: {
+        abortEarly: false,
+        allowUnknown: true,
+        stripUnknown: true,
+        convert: true,
+      },
+    }),
+  ],
+  providers: [WorkerService, YellowApiService, ChannelService, AssetService, NodeConfigService],
 })
 export class WorkerModule {}

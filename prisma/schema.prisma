@@ -82,7 +82,29 @@ model RpcStore {
 model WorkerState {
   id                     String   @id
   lastProcessedTimestamp BigInt
+  cursor                 String? // NEW: composite cursor "ms:channelId"
   updated_at             DateTime @updatedAt
 
   @@map("worker_states")
+}
+
+model NodeConfig {
+  id             String   @id @default("default") // singleton
+  broker_address String   @db.VarChar(255)
+  updated_at     DateTime @updatedAt
+
+  @@map("node_config")
+}
+
+model Network {
+  chain_id            BigInt   @id
+  name                String
+  custody_address     String   @db.VarChar(255)
+  adjudicator_address String   @db.VarChar(255)
+  broker_address      String   @db.VarChar(255)
+  last_seen_at        DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@index([name])
+  @@map("networks")
 }

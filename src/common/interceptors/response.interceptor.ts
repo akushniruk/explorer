@@ -23,20 +23,19 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
         if (this.isPaginatedResponse(data)) {
           return {
             success: true,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
             data: data.items,
             meta: {
               timestamp,
               requestId,
               version: process.env.npm_package_version || '1.0.0',
               pagination: {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 page: data.page,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
                 limit: data.limit,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
                 total: data.total,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
                 totalPages: data.totalPages,
               },
             },
@@ -46,7 +45,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
         // Standard success response
         return {
           success: true,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
           data,
           meta: {
             timestamp,
