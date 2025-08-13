@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -22,13 +24,18 @@ model Channel {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now()) @updatedAt
 
+  @@index([wallet])
+  @@index([participant])
+  @@index([token, chain_id])
+  @@index([status, updated_at])
+  @@index([created_at])
   @@map("channels")
 }
 
 model Asset {
   token    String
   chain_id BigInt
-  symbol   String
+  symbol   String @db.Citext
   decimals BigInt
 
   @@id([token, chain_id])
@@ -46,6 +53,9 @@ model Ledger {
   debit        Decimal  @db.Decimal(64, 18)
   created_at   DateTime @default(now())
 
+  @@index([account_id, created_at])
+  @@index([wallet, created_at])
+  @@index([asset_symbol, created_at])
   @@map("ledgers")
 }
 
@@ -65,6 +75,8 @@ model AppSession {
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now()) @updatedAt
 
+  @@index([channel_id])
+  @@index([status, updated_at])
   @@map("app_sessions")
 }
 
@@ -79,13 +91,16 @@ model RpcStore {
   response  String   @db.Text
   res_sig   String[] @db.Text
 
+  @@index([req_id])
+  @@index([method])
+  @@index([sender])
   @@map("rpc_store")
 }
 
 model WorkerState {
   id                     String   @id
   lastProcessedTimestamp BigInt
-  cursor                 String? // NEW: composite cursor "ms:channelId"
+  cursor                 String? // composite cursor "ms:channelId"
   updated_at             DateTime @updatedAt
 
   @@map("worker_states")
@@ -101,7 +116,7 @@ model NodeConfig {
 
 model Network {
   chain_id            BigInt   @id
-  name                String
+  name                String   @db.Citext
   custody_address     String   @db.VarChar(255)
   adjudicator_address String   @db.VarChar(255)
   broker_address      String   @db.VarChar(255)
