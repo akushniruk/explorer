@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NodeConfigService } from './node-config/node-config.service';
 import workerCfg from './worker.config';
 import { ConfigType } from '@nestjs/config';
+import { AssetService } from './asset/asset.service';
 
 const WORKER_STATE_KEY = 'channels:last_ts';
 const JOB_ID = 'channels-sync';
@@ -34,6 +35,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
   private latestCursor: ChannelCursor | null = null;
   private isInitialSyncComplete = false;
   private isSyncing = false;
+  private lastAssetsSyncMs = 0;
 
   constructor(
     private readonly yellowApiService: YellowApiService,
@@ -41,6 +43,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly nodeConfigService: NodeConfigService,
     private readonly scheduler: SchedulerRegistry,
+    private readonly assetService: AssetService,
     @Inject(workerCfg.KEY) private readonly cfg: ConfigType<typeof workerCfg>,
   ) {}
 
@@ -58,6 +61,15 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     // Force a real config fetch on boot (persists to DB)
     await this.nodeConfigService.warm({ forceFetch: true });
+
+    try {
+      const res = await this.assetService.syncAssets(); // all chains
+
+      this.lastAssetsSyncMs = Date.now();
+      this.logger.log('Initial assets warm-up done', { count: res.count });
+    } catch (e) {
+      this.logger.warn(`Initial assets warm-up failed: ${(e as Error).message}`);
+    }
 
     // Load persisted cursor (composite)
     this.latestCursor = await this.loadCursor();
@@ -95,6 +107,18 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleSync(): Promise<void> {
+    const assetsRefreshMs = Number(this.cfg?.sync?.assetsRefreshMs ?? 30 * 60 * 1000); // 30m
+
+    if (Date.now() - this.lastAssetsSyncMs >= assetsRefreshMs) {
+      try {
+        const res = await this.assetService.syncAssets();
+        this.lastAssetsSyncMs = Date.now();
+        this.logger.log('Periodic assets refresh completed', { count: res.count });
+      } catch (e) {
+        this.logger.warn(`Periodic assets refresh failed: ${(e as Error).message}`);
+      }
+    }
+
     if (this.isSyncing) {
       this.logger.warn('Sync already in progress; skipping this tick', {
         component: 'WorkerService',

@@ -6,9 +6,11 @@ import {
   MessageSigner,
   createGetChannelsMessage,
   createGetConfigMessage,
+  createGetAssetsMessage,
   NitroliteRPCMessage,
   GetChannelsResponse,
   GetConfigResponse,
+  GetAssetsResponse,
   rpcResponseParser,
   parseAnyRPCResponse,
 } from '@erc7824/nitrolite';
@@ -85,6 +87,13 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- Public RPCs ----------
+
+  public async getAssets(chainId?: number): Promise<GetAssetsResponse> {
+    return this.sendRequest<RPCMethod.GetAssets>(
+      (s) => createGetAssetsMessage(s, chainId),
+      RPCMethod.GetAssets,
+    );
+  }
 
   public async getConfig(): Promise<GetConfigResponse> {
     return this.sendRequest<RPCMethod.GetConfig>(
@@ -212,6 +221,9 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
           break;
         case RPCMethod.GetConfig:
           response = rpcResponseParser.getConfig(rawData);
+          break;
+        case RPCMethod.GetAssets:
+          response = rpcResponseParser.getAssets(rawData);
           break;
         default:
           this.logger.warn('Unhandled RPC method received', {

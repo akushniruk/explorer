@@ -32,6 +32,7 @@ model Asset {
   decimals BigInt
 
   @@id([token, chain_id])
+  @@index([symbol])
   @@map("assets")
 }
 

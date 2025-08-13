@@ -11,6 +11,7 @@ export type EnvVars = {
   YELLOW_WS_REQUEST_TIMEOUT_MS: number;
   YELLOW_WS_RECONNECT_BASE_MS: number;
   YELLOW_WS_RECONNECT_MAX_MS: number;
+  SYNC_ASSETS_REFRESH_MS: number;
 
   SYNC_INTERVAL_MS: number;
   SYNC_FULL_SLEEP_MS: number;
@@ -33,6 +34,10 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
   YELLOW_WS_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).default(90_000),
   YELLOW_WS_RECONNECT_BASE_MS: Joi.number().integer().min(100).default(1_000),
   YELLOW_WS_RECONNECT_MAX_MS: Joi.number().integer().min(1_000).default(60_000),
+  SYNC_ASSETS_REFRESH_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .default(30 * 60 * 1000),
 
   SYNC_INTERVAL_MS: Joi.number().integer().min(5_000).default(90_000),
   SYNC_FULL_SLEEP_MS: Joi.number().integer().min(0).default(3_000),

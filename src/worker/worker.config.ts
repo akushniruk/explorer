@@ -9,6 +9,7 @@ export default registerAs('worker', () => ({
     intervalMs: Number(process.env.SYNC_INTERVAL_MS ?? 90_000),
     fullSleepMs: Number(process.env.SYNC_FULL_SLEEP_MS ?? 3_000),
     channelsLimit: Number(process.env.SYNC_CHANNELS_LIMIT ?? 100),
+    assetsRefreshMs: Number(process.env.SYNC_ASSETS_REFRESH_MS ?? 30 * 60 * 1000),
   },
   tx: {
     pageSize: Number(process.env.SYNC_TXS_PAGE_SIZE ?? 200),
