@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { EtagInterceptor, VersionService } from './common/etag';
 import { ExplorerModule } from './explorer/explorer.module';
 import { envValidationSchema } from './config/env.validation';
 import { ApiModule } from './api/api.module';
@@ -26,8 +27,10 @@ import { ApiModule } from './api/api.module';
   ],
   controllers: [],
   providers: [
+    VersionService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: EtagInterceptor },
   ],
 })
 export class AppModule {}

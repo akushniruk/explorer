@@ -24,6 +24,9 @@ export type EnvVars = {
 
   RATE_LIMIT_RPM: number;
   CORS_ORIGINS: string;
+
+  // ETag caching
+  ENABLE_ETAG: string;
 };
 
 export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars>({
@@ -54,4 +57,7 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
 
   RATE_LIMIT_RPM: Joi.number().integer().min(30).default(60),
   CORS_ORIGINS: Joi.string().default('*'),
+
+  // ETag caching
+  ENABLE_ETAG: Joi.string().valid('true', 'false').default('false'),
 }).prefs({ convert: true, abortEarly: false });

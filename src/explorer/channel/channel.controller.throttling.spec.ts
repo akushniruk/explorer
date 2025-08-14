@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -8,7 +9,7 @@ import { ChannelController } from './channel.controller';
 import { ChannelService } from './channel.service';
 
 describe('ChannelController throttling (HTTP)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   // local mocks (avoid unbound-method lint)
   let getOneMock: jest.Mock;

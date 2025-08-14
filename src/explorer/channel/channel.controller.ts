@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ChannelService } from './channel.service';
 import { GetChannelQueryDto } from './dto/get-channel.dto';
 import { ListChannelsQueryDto } from './dto/list-channels.dto';
+import { EtagResource } from '../../common/etag';
 
 @Controller({ path: 'channel', version: '1' })
 export class ChannelController {
@@ -10,6 +11,7 @@ export class ChannelController {
 
   /** Single channel by params (query) */
   @Get()
+  @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
   @Header('Cache-Control', 'public, max-age=5')
   getOneByQuery(@Query() q: GetChannelQueryDto) {
@@ -18,6 +20,7 @@ export class ChannelController {
 
   /** List with pagination + total */
   @Get('list')
+  @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
   @Header('Cache-Control', 'public, max-age=5')
   list(@Query() q: ListChannelsQueryDto) {
@@ -26,6 +29,7 @@ export class ChannelController {
 
   /** Total count (lightweight) */
   @Get('count')
+  @EtagResource('channels')
   @Throttle({ default: { limit: 120, ttl: 60 } })
   @Header('Cache-Control', 'public, max-age=15')
   count(@Query() q: Pick<ListChannelsQueryDto, 'status' | 'token' | 'chainId'>) {
@@ -34,6 +38,7 @@ export class ChannelController {
 
   /** Convenience: single channel by path */
   @Get('/:id')
+  @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
   @Header('Cache-Control', 'public, max-age=5')
   getOneByPath(@Param('id') id: string) {

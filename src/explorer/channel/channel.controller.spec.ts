@@ -1,12 +1,13 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 
 import { ChannelController } from './channel.controller';
 import { ChannelService } from './channel.service';
 
 describe('ChannelController (HTTP)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   // keep mocks in locals to avoid the "unbound-method" lint issue
   let getOneMock: jest.Mock;

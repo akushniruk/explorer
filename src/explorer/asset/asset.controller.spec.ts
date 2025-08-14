@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
+import { App } from 'supertest/types';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -8,7 +9,7 @@ import { AssetController } from './asset.controller';
 import { AssetService } from './asset.service';
 
 describe('AssetController (HTTP)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   let getOneMock: jest.Mock;
   let listMock: jest.Mock;

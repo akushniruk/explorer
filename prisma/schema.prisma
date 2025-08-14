@@ -29,17 +29,21 @@ model Channel {
   @@index([token, chain_id])
   @@index([status, updated_at])
   @@index([created_at])
+  @@index([updated_at])
   @@map("channels")
 }
 
 model Asset {
-  token    String
-  chain_id BigInt
-  symbol   String @db.Citext
-  decimals BigInt
+  token      String
+  chain_id   BigInt
+  symbol     String   @db.Citext
+  decimals   BigInt
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
 
   @@id([token, chain_id])
   @@index([symbol])
+  @@index([updated_at])
   @@map("assets")
 }
 
@@ -77,6 +81,7 @@ model AppSession {
 
   @@index([channel_id])
   @@index([status, updated_at])
+  @@index([updated_at])
   @@map("app_sessions")
 }
 
@@ -124,6 +129,7 @@ model Network {
   updated_at          DateTime @updatedAt
 
   @@index([name])
+  @@index([updated_at])
   @@map("networks")
 }
 
@@ -164,5 +170,6 @@ model Node {
   @@index([country_code])
   @@index([status, updated_at])
   @@index([latitude, longitude])
+  @@index([updated_at])
   @@map("nodes")
 }

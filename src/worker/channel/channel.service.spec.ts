@@ -43,7 +43,7 @@ describe('ChannelService', () => {
     });
 
     it('should handle null channels', async () => {
-      await service.processChannels(null as any);
+      await service.processChannels(null as GetChannelsResponseParams);
       expect(mockPrismaService.channel.upsert).not.toHaveBeenCalled();
     });
 
@@ -134,7 +134,9 @@ describe('ChannelService', () => {
         },
       ];
 
-      jest.spyOn(prismaService.channel, 'upsert').mockResolvedValue({} as any);
+      jest
+        .spyOn(prismaService.channel, 'upsert')
+        .mockImplementation(() => Promise.resolve({} as any));
 
       await service.processChannels(mockChannels);
 
