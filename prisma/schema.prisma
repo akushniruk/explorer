@@ -126,3 +126,43 @@ model Network {
   @@index([name])
   @@map("networks")
 }
+
+enum NodeRegion {
+  europe
+  north_america
+  south_america
+  africa
+  asia_pacific
+  middle_east
+}
+
+model Node {
+  id          String  @id @default(cuid())
+  slug        String  @unique // kebab-case stable id
+  name        String
+  ws_url      String  @db.Text // public WS endpoint to connect
+  description String? @db.Text
+
+  website_host String? @db.VarChar(255) // e.g. "app.io"
+  icon_key     String? @db.VarChar(128) // e.g. "app" (frontend/CDN asset key)
+
+  country_code String     @db.VarChar(2) // ISO-3166 alpha-2
+  region       NodeRegion
+  latitude     Decimal    @db.Decimal(9, 6)
+  longitude    Decimal    @db.Decimal(9, 6)
+
+  status       String    @default("unknown") // online|degraded|offline|unknown
+  available    Boolean   @default(false)
+  latency_ms   Int?
+  last_seen_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([name, ws_url])
+  @@index([region])
+  @@index([country_code])
+  @@index([status, updated_at])
+  @@index([latitude, longitude])
+  @@map("nodes")
+}
