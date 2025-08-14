@@ -53,7 +53,7 @@ async function main() {
         icon_key: n.iconKey ?? null,
         description: n.description ?? null,
         country_code: n.country,
-        region: n.region,
+        region: n.region as NodeRegion,
         latitude: D(n.lat),
         longitude: D(n.lng),
         status: 'unknown',
@@ -64,6 +64,7 @@ async function main() {
   }
 
   const total = await prisma.node.count();
+
   console.log(`Seeded/updated nodes: ${upserts}; total rows now: ${total}`);
 }
 
