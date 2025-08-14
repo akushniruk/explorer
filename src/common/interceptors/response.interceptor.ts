@@ -1,7 +1,6 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Request } from 'express';
 import { ApiSuccessResponse } from '../types/api-response.types';
 
 @Injectable()
@@ -57,19 +56,21 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
     );
   }
 
-  private isPaginatedResponse(data: any): boolean {
-    return (
+  private isPaginatedResponse(
+    data: any,
+  ): data is { items: any[]; page: number; limit: number; total: number; totalPages: number } {
+    return Boolean(
       data &&
-      typeof data === 'object' &&
-      'items' in data &&
-      'page' in data &&
-      'limit' in data &&
-      'total' in data &&
-      'totalPages' in data
+        typeof data === 'object' &&
+        'items' in data &&
+        'page' in data &&
+        'limit' in data &&
+        'total' in data &&
+        'totalPages' in data,
     );
   }
 
   private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 }

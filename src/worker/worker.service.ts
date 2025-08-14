@@ -123,7 +123,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     try {
       const handle = this.scheduler.getInterval(JOB_ID);
 
-      clearInterval(handle);
+      clearInterval(handle as NodeJS.Timeout);
       this.scheduler.deleteInterval(JOB_ID);
     } catch {
       /* noop */

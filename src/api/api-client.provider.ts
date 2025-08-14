@@ -19,7 +19,8 @@ export class ApiClient {
 
     if (res.status >= 500) throw new HttpException('Upstream error', 502);
 
-    if (res.data?.error) throw new HttpException(res.data.error?.message || 'Upstream error', 502);
+    if (res.data?.error)
+      throw new HttpException(String(res.data.error?.message) || 'Upstream error', 502);
 
     return res.data.result as T;
   }

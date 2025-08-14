@@ -123,9 +123,9 @@ export class NodeConfigService {
 
       networks = nets.map((n: any) => ({
         name: n.name,
-        chainId: toNum(n.chain_id, 'chainId'),
-        custodyAddress: asAddress(n.custody_address, 'custodyAddress'),
-        adjudicatorAddress: asAddress(n.adjudicator_address, 'adjudicatorAddress'),
+        chainId: toNum(n.chain_id as bigint, 'chainId'),
+        custodyAddress: asAddress(n.custody_address as string, 'custodyAddress'),
+        adjudicatorAddress: asAddress(n.adjudicator_address as string, 'adjudicatorAddress'),
       }));
     } catch {
       // networks table not present yet — OK for early MVP

@@ -1,5 +1,5 @@
 import { IsIn, IsNumberString, IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from 'src/common/dto/pagination.dto';
+import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
 
 export class ListAssetsQueryDto extends PaginationQueryDto {
   /** contains match on symbol (case-insensitive) */
