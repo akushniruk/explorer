@@ -55,6 +55,24 @@ function parseBbox(bbox?: string) {
 export class NodeService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async single(q: Pick<ListNodesQueryDto, 'q'>) {
+    if (!q.q) {
+      throw new Error('Query parameter "q" is required');
+    }
+
+    const node = await this.prisma.node.findFirst({
+      where: {
+        OR: [{ slug: q.q }, { name: { contains: q.q, mode: 'insensitive' } }],
+      },
+    });
+
+    if (!node) {
+      throw new Error('Node not found');
+    }
+
+    return serialize(node);
+  }
+
   async list(q: ListNodesQueryDto) {
     const where: Prisma.NodeWhereInput = {
       ...(q.q ? { name: { contains: q.q, mode: 'insensitive' } } : {}),
@@ -105,5 +123,42 @@ export class NodeService {
       totalPages,
       hasMore: q.page < totalPages,
     };
+  }
+
+  async count(filters: Pick<ListNodesQueryDto, 'q' | 'country' | 'region' | 'status' | 'bbox'>) {
+    const where: Prisma.NodeWhereInput = {
+      ...(filters.q ? { name: { contains: filters.q, mode: 'insensitive' } } : {}),
+      ...(filters.country ? { country_code: filters.country.toUpperCase() } : {}),
+      ...(filters.region ? { region: filters.region } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+    };
+
+    const bbox = parseBbox(filters.bbox);
+
+    if (bbox) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          latitude: { gte: new Prisma.Decimal(bbox.minLat), lte: new Prisma.Decimal(bbox.maxLat) },
+        },
+        {
+          longitude: { gte: new Prisma.Decimal(bbox.minLng), lte: new Prisma.Decimal(bbox.maxLng) },
+        },
+      ];
+    }
+
+    const total = await this.prisma.node.count({ where });
+
+    return { total };
+  }
+
+  async countActive() {
+    const total = await this.prisma.node.count({
+      where: {
+        OR: [{ status: 'active' }, { available: true }],
+      },
+    });
+
+    return { total };
   }
 }

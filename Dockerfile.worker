@@ -1,0 +1,56 @@
+# Worker Dockerfile for NestJS worker application
+FROM node:20-alpine AS base
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Copy package files and Prisma schema
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+
+# Build stage
+FROM base AS build
+
+# Install all dependencies (including dev for Prisma)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client and build the worker application
+RUN npx prisma generate
+RUN pnpm run build:worker
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nestjs -u 1001
+
+# Copy built application and production dependencies only
+COPY --from=build --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=build --chown=nestjs:nodejs /app/package.json ./
+COPY --from=build --chown=nestjs:nodejs /app/pnpm-lock.yaml ./
+COPY --from=build --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=build --chown=nestjs:nodejs /app/node_modules/.pnpm ./node_modules/.pnpm
+
+# Install only production dependencies (skip postinstall to avoid prisma generate)
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+
+# Switch to non-root user
+USER nestjs
+
+# Health check for worker (no HTTP endpoint, so check process)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD pgrep -f "node dist/src/worker.js" > /dev/null || exit 1
+
+# Start the worker application
+CMD ["pnpm", "run", "start:worker"]

@@ -7,6 +7,9 @@ type NodeEnv = (typeof NODE_ENV_VALUES)[number];
 export type EnvVars = {
   NODE_ENV: NodeEnv;
 
+  DATABASE_URL: string;
+  DIRECT_URL?: string;
+
   YELLOW_API_URL: string;
   YELLOW_WS_REQUEST_TIMEOUT_MS: number;
   YELLOW_WS_RECONNECT_BASE_MS: number;
@@ -33,6 +36,9 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
   NODE_ENV: Joi.string()
     .valid(...NODE_ENV_VALUES)
     .default('development'),
+
+  DATABASE_URL: Joi.string().uri().required(),
+  DIRECT_URL: Joi.string().uri().optional(),
 
   YELLOW_API_URL: Joi.string()
     .uri({ scheme: ['ws', 'wss'] })

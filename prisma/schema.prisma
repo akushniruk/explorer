@@ -24,6 +24,9 @@ model Channel {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now()) @updatedAt
 
+  // Relation to Asset
+  asset Asset? @relation(fields: [token, chain_id], references: [token, chain_id])
+
   @@index([wallet])
   @@index([participant])
   @@index([token, chain_id])
@@ -40,6 +43,9 @@ model Asset {
   decimals   BigInt
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
+
+  // Reverse relation to Channel
+  channels Channel[]
 
   @@id([token, chain_id])
   @@index([symbol])

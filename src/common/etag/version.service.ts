@@ -102,7 +102,7 @@ export class VersionService {
       `SELECT
         COALESCE(MAX(EXTRACT(EPOCH FROM updated_at))::BIGINT, 0) AS v,
         COUNT(*)::BIGINT AS c
-      FROM ${tableName}`
+      FROM ${tableName}`,
     );
 
     if (!result || result.length === 0) {

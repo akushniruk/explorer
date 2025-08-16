@@ -11,6 +11,14 @@ export class ChannelService {
   async getOne(q: GetChannelQueryDto) {
     const item = await this.prisma.channel.findUnique({
       where: { channel_id: q.channelId },
+      include: {
+        asset: {
+          select: {
+            symbol: true,
+            decimals: true,
+          },
+        },
+      },
     });
 
     if (!item) throw new NotFoundException(`Channel ${q.channelId} not found`);
@@ -23,6 +31,12 @@ export class ChannelService {
       challenge: item.challenge.toString(),
       nonce: item.nonce.toString(),
       version: item.version.toString(),
+      asset: item.asset
+        ? {
+            symbol: item.asset.symbol,
+            decimals: item.asset.decimals.toString(),
+          }
+        : null,
     };
   }
 
@@ -50,7 +64,20 @@ export class ChannelService {
 
     const offset = (q.page - 1) * q.limit;
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.channel.findMany({ where, orderBy, skip: offset, take: q.limit }),
+      this.prisma.channel.findMany({
+        where,
+        orderBy,
+        skip: offset,
+        take: q.limit,
+        include: {
+          asset: {
+            select: {
+              symbol: true,
+              decimals: true,
+            },
+          },
+        },
+      }),
       this.prisma.channel.count({ where }),
     ]);
 
@@ -64,6 +91,12 @@ export class ChannelService {
       challenge: item.challenge.toString(),
       nonce: item.nonce.toString(),
       version: item.version.toString(),
+      asset: item.asset
+        ? {
+            symbol: item.asset.symbol,
+            decimals: item.asset.decimals.toString(),
+          }
+        : null,
     }));
 
     return {

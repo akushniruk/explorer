@@ -11,6 +11,7 @@ import { EtagInterceptor, VersionService } from './common/etag';
 import { ExplorerModule } from './explorer/explorer.module';
 import { envValidationSchema } from './config/env.validation';
 import { ApiModule } from './api/api.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ApiModule } from './api/api.module';
     PrismaModule,
     ExplorerModule,
     ApiModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [
