@@ -122,7 +122,6 @@ export class NodeConfigService {
       const nets = await this.prisma.network.findMany({ orderBy: { chain_id: 'asc' } });
 
       networks = nets.map((n: any) => ({
-        name: n.name,
         chainId: toNum(n.chain_id as bigint, 'chainId'),
         custodyAddress: asAddress(n.custody_address as string, 'custodyAddress'),
         adjudicatorAddress: asAddress(n.adjudicator_address as string, 'adjudicatorAddress'),
@@ -159,7 +158,7 @@ export class NodeConfigService {
           await tx.network.upsert({
             where: { chain_id: BigInt(n.chainId) },
             update: {
-              name: n.name,
+              name: `Chain ${n.chainId}`,
               custody_address: n.custodyAddress,
               adjudicator_address: n.adjudicatorAddress,
               broker_address: params.brokerAddress,
@@ -167,7 +166,7 @@ export class NodeConfigService {
             },
             create: {
               chain_id: BigInt(n.chainId),
-              name: n.name,
+              name: `Chain ${n.chainId}`,
               custody_address: n.custodyAddress,
               adjudicator_address: n.adjudicatorAddress,
               broker_address: params.brokerAddress,

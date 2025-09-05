@@ -208,12 +208,12 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     let totalChannelsProcessed = 0;
 
     while (true) {
-      let channels: GetChannelsResponseParams | undefined;
+      let channelsResponse: GetChannelsResponseParams | undefined;
 
       try {
         const response = await this.yellowApiService.getChannels({ limit, offset, sort: 'desc' });
 
-        channels = response.params;
+        channelsResponse = response.params;
       } catch (e) {
         this.logger.warn('Upstream unavailable during full sync; aborting this cycle', {
           error: (e as Error).message,
@@ -223,18 +223,19 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         break;
       }
 
-      if (!channels || channels.length === 0) break;
+      if (!channelsResponse || !channelsResponse.channels || channelsResponse.channels.length === 0)
+        break;
 
       if (offset === 0) {
-        const top = channels[0];
+        const top = channelsResponse.channels[0];
 
         newestCursor = { t: new Date(top.createdAt).getTime(), id: top.channelId };
       }
 
-      await this.channelService.processChannels(channels);
-      totalChannelsProcessed += channels.length;
+      await this.channelService.processChannels(channelsResponse);
+      totalChannelsProcessed += channelsResponse.channels.length;
 
-      if (channels.length < limit) break;
+      if (channelsResponse.channels.length < limit) break;
 
       offset += limit;
 
@@ -275,7 +276,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     const cur = this.latestCursor;
     const startTime = Date.now();
-    const allNewChannels: GetChannelsResponseParams = [];
+    const allNewChannels: GetChannelsResponseParams = { channels: [] };
 
     this.logger.log('Started incremental channel synchronization', {
       operation: 'incremental_sync',
@@ -301,10 +302,10 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         break;
       }
 
-      if (!respParams || respParams.length === 0) break;
+      if (!respParams || !respParams.channels || respParams.channels.length === 0) break;
 
       const page =
-        respParams.filter((c) => {
+        respParams.channels.filter((c) => {
           const t = new Date(c.createdAt).getTime();
 
           return compareCursor({ t, id: c.channelId }, cur) > 0;
@@ -316,19 +317,19 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         nextCursor = { t: new Date(top.createdAt).getTime(), id: top.channelId };
       }
 
-      allNewChannels.push(...page);
+      allNewChannels.channels.push(...page);
 
-      if (respParams.length < limit || page.length === 0) break;
+      if (respParams.channels.length < limit || page.length === 0) break;
 
       offset += limit;
     }
 
     const duration = Date.now() - startTime;
 
-    if (allNewChannels.length > 0 && nextCursor) {
+    if (allNewChannels.channels.length > 0 && nextCursor) {
       this.logger.log('Incremental channel synchronization completed', {
         operation: 'incremental_sync',
-        newChannels: allNewChannels.length,
+        newChannels: allNewChannels.channels.length,
         durationMs: duration,
         latestCursor: encodeCursor(nextCursor),
       });

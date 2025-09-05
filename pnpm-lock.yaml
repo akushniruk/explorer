@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@erc7824/nitrolite':
-        specifier: 0.2.31
-        version: 0.2.31(typescript@5.8.3)
+        specifier: 0.3.0
+        version: 0.3.0(typescript@5.8.3)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.5(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -367,8 +367,8 @@ packages:
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
 
-  '@erc7824/nitrolite@0.2.31':
-    resolution: {integrity: sha512-CIB9vMmBmPzPvhwMHYGfoNcyCav8nErtUnMCFdHHWRCWLO8aaM/jVRCHM6CTEibN4fmXdFGSGRukMDt2UMLVDA==}
+  '@erc7824/nitrolite@0.3.0':
+    resolution: {integrity: sha512-EcQGGYqiD5dKpMj4FXWZT+Icv21FIm2V2Di3P41ucsI4MpPxWq8hg8BVIu9yoE2AFjBiAdfTmH0JCNNGXJkT5g==}
     engines: {node: '>=20.0.0'}
 
   '@esbuild/aix-ppc64@0.25.9':
@@ -4097,7 +4097,7 @@ snapshots:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
 
-  '@erc7824/nitrolite@0.2.31(typescript@5.8.3)':
+  '@erc7824/nitrolite@0.3.0(typescript@5.8.3)':
     dependencies:
       abitype: 0.10.3(typescript@5.8.3)(zod@3.25.76)
       viem: 2.33.1(typescript@5.8.3)(zod@3.25.76)

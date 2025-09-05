@@ -5,7 +5,10 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   try {
     // Dynamically import CJS middlewares and normalize the export shape
-    const [helmetMod, compressionMod] = await Promise.all([import('helmet'), import('compression')]);
+    const [helmetMod, compressionMod] = await Promise.all([
+      import('helmet'),
+      import('compression'),
+    ]);
 
     const helmetFn = (helmetMod as any).default ?? (helmetMod as any); // default or module function
     const compressionFn = (compressionMod as any).default ?? (compressionMod as any);
@@ -20,6 +23,7 @@ async function bootstrap() {
     app.use(compressionFn());
 
     const port = Number(process.env.PORT) || 3000;
+
     await app.listen(port);
     console.log(`Application is running on port ${port}`);
   } catch (error) {

@@ -16,7 +16,6 @@ import {
   createGetAssetsMessage,
   createGetAppSessionsMessage,
   createPingMessage,
-  rpcResponseParser,
   parseAnyRPCResponse,
 } from '@erc7824/nitrolite';
 import workerCfg from './worker.config';
@@ -239,48 +238,18 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
 
       let response: RPCResponse;
 
-      switch (method) {
-        case RPCMethod.GetChannels:
-          response = rpcResponseParser.getChannels(rawData);
-          break;
-
-        case RPCMethod.GetConfig:
-          response = rpcResponseParser.getConfig(rawData);
-          break;
-
-        case RPCMethod.GetAssets:
-          response = rpcResponseParser.getAssets(rawData);
-          break;
-
-        case RPCMethod.GetAppSessions:
-          try {
-            response = rpcResponseParser.getAppSessions(rawData);
-          } catch (err) {
-            // SDK zod (participants Address[]) failed — accept raw payload
-            this.logger.warn('GetAppSessions strict parse failed; using loose response', {
-              component: 'YellowApiService',
-              error: (err as Error)?.message ?? String(err),
-              requestId,
-            });
-            response = this.makeLooseResponse(RPCMethod.GetAppSessions, rawData, requestId);
-          }
-
-          break;
-
-        case RPCMethod.Pong:
-          // no params; noop
-          response = this.makeLooseResponse(RPCMethod.Pong, rawData, requestId);
-          break;
-
-        default:
-          // Try generic parser; if that fails too, use loose
-          try {
-            response = parseAnyRPCResponse(rawData);
-          } catch {
-            response = this.makeLooseResponse(method, rawData, requestId);
-          }
-
-          break;
+      // Use generic parser for all responses, fall back to loose response if needed
+      try {
+        response = parseAnyRPCResponse(rawData);
+      } catch (err) {
+        // Generic parser failed, use loose response
+        this.logger.warn('Response parsing failed; using loose response', {
+          component: 'YellowApiService',
+          method,
+          error: (err as Error)?.message ?? String(err),
+          requestId,
+        });
+        response = this.makeLooseResponse(method, rawData, requestId);
       }
 
       const entry = this.pendingRequests.get(requestId);
@@ -415,9 +384,16 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
       const obj = JSON.parse(raw);
       let p = Array.isArray(obj.res) ? obj.res[2] : undefined;
 
-      // get_app_sessions returns [[ {...}, ... ]]
-      if (method === RPCMethod.GetAppSessions && Array.isArray(p) && Array.isArray(p[0])) {
-        p = p[0];
+      // In v0.3.0, responses should have proper structure, but handle legacy format
+      if (method === RPCMethod.GetAppSessions) {
+        if (Array.isArray(p) && Array.isArray(p[0])) {
+          // Legacy format: [[ {...}, ... ]]
+          p = { appSessions: p[0] };
+        } else if (Array.isArray(p) && !('appSessions' in (p as any))) {
+          // Direct array format: [ {...}, ... ]
+          p = { appSessions: p };
+        }
+        // Otherwise assume it's already in correct { appSessions: [...] } format
       }
 
       params = p;

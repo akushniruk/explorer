@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { YellowApiService } from '../yellow-api.service';
-import { GetAppSessionsResponse, GetAppSessionsResponseParams } from '@erc7824/nitrolite';
+import { GetAppSessionsResponse, RPCAppSession } from '@erc7824/nitrolite';
 import workerCfg from '../worker.config';
 import { ConfigType } from '@nestjs/config';
 
@@ -20,7 +20,7 @@ type RawSnake = {
   session_data?: unknown;
 };
 
-type AnySession = GetAppSessionsResponseParams | RawSnake | Record<string, unknown>;
+type AnySession = RPCAppSession | RawSnake | Record<string, unknown>;
 
 @Injectable()
 export class AppSessionService {
@@ -62,20 +62,31 @@ export class AppSessionService {
         break;
       }
 
-      // res.params may be either:
-      //  - [ { ... }, ... ]  (strict SDK path)
-      //  - [ [ { ... }, ... ] ]  (loose path; raw snake_case from server)
-      const rawParams = res.params ?? [];
-      const page: unknown[] =
-        Array.isArray(rawParams) && rawParams.length === 1 && Array.isArray((rawParams as any)[0])
-          ? (rawParams as any)[0]
-          : (rawParams as any);
+      // res.params should now have appSessions property in v0.3.0
+      // Handle both old direct array format and new nested format for compatibility
+      const rawParams = res.params ?? {};
+      let page: unknown[];
+
+      if (rawParams && typeof rawParams === 'object' && 'appSessions' in rawParams) {
+        // New v0.3.0 format: { appSessions: [...] }
+        page = Array.isArray((rawParams as any).appSessions) ? (rawParams as any).appSessions : [];
+      } else {
+        // Legacy format fallback
+        const rawArray = rawParams as any;
+
+        page =
+          Array.isArray(rawArray) && rawArray.length === 1 && Array.isArray(rawArray[0])
+            ? rawArray[0]
+            : Array.isArray(rawArray)
+              ? rawArray
+              : [];
+      }
 
       if (!Array.isArray(page) || page.length === 0) break;
 
       const normalized = (page as AnySession[])
         .map((s) => this.normalizeToCamel(s))
-        .filter((v): v is GetAppSessionsResponseParams => !!v);
+        .filter((v): v is RPCAppSession => !!v);
 
       if (normalized.length === 0) {
         this.logger.warn('All app sessions on page skipped due to normalization issues', {
@@ -101,10 +112,10 @@ export class AppSessionService {
    * Normalize either SDK-shaped (camelCase) or raw snake_case objects to the SDK type.
    * No address validation; participants are persisted as strings as-is.
    */
-  private normalizeToCamel(s: AnySession): GetAppSessionsResponseParams | null {
+  private normalizeToCamel(s: AnySession): RPCAppSession | null {
     // Case 1: already camelCase (strict parser path)
     if (s && typeof s === 'object' && 'appSessionId' in s) {
-      const c = s as GetAppSessionsResponseParams;
+      const c = s as RPCAppSession;
       const id = String(c.appSessionId ?? '');
 
       if (!id) {
@@ -126,7 +137,7 @@ export class AppSessionService {
         createdAt: this.dateOrNull(c.createdAt),
         updatedAt: this.dateOrNull(c.updatedAt),
         sessionData: c.sessionData ?? undefined,
-      } as GetAppSessionsResponseParams;
+      } as RPCAppSession;
     }
 
     // Case 2: snake_case (loose parser path)
@@ -152,7 +163,7 @@ export class AppSessionService {
       createdAt: this.dateOrNull(r.created_at),
       updatedAt: this.dateOrNull(r.updated_at),
       sessionData: (r.session_data as any) ?? undefined,
-    } as GetAppSessionsResponseParams;
+    } as RPCAppSession;
   }
 
   private num(v: unknown): number {
@@ -183,7 +194,7 @@ export class AppSessionService {
    * Upsert normalized sessions in chunks. No address validation; raw participants persisted.
    * `created_at` is set only when valid; otherwise Prisma uses default(now()).
    */
-  private async process(items: GetAppSessionsResponseParams[]): Promise<void> {
+  private async process(items: RPCAppSession[]): Promise<void> {
     const rows = items.map((s) => {
       const created = s.createdAt ?? null;
 

@@ -38,7 +38,7 @@ export class AssetService {
     const res = await this.yellow.getAssets(opts?.chainId);
     const params = res.params;
 
-    if (!params || params.length === 0) {
+    if (!params || !params.assets || params.assets.length === 0) {
       this.logger.log('No assets returned from upstream', {
         chainId: opts?.chainId ?? 'all',
       });
@@ -51,20 +51,20 @@ export class AssetService {
     const duration = Date.now() - start;
 
     this.logger.log('Assets synchronized', {
-      count: params.length,
+      count: params.assets.length,
       chainId: opts?.chainId ?? 'all',
       durationMs: duration,
     });
 
-    return { count: params.length };
+    return { count: params.assets.length };
   }
 
   /**
    * Idempotent upserts in chunks. Validates addresses/decimals.
    */
-  async processAssets(params: GetAssetsResponseParams[]): Promise<void> {
+  async processAssets(assetsResponse: GetAssetsResponseParams): Promise<void> {
     // map & validate
-    const rows = params.map((a) => ({
+    const rows = assetsResponse.assets.map((a) => ({
       token: asAddress(a.token, 'token'),
       chain_id: toBigIntSafe(a.chainId, 'chainId'),
       symbol: sanitizeSymbol(a.symbol),

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChannelService } from './channel.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GetChannelsResponseParams } from '@erc7824/nitrolite';
+import { GetChannelsResponseParams, RPCChannelUpdateWithWallet } from '@erc7824/nitrolite';
 
 describe('ChannelService', () => {
   let service: ChannelService;
@@ -38,17 +38,17 @@ describe('ChannelService', () => {
 
   describe('processChannels', () => {
     it('should handle empty channel array', async () => {
-      await service.processChannels([]);
+      await service.processChannels({ channels: [] });
       expect(mockPrismaService.channel.upsert).not.toHaveBeenCalled();
     });
 
     it('should handle null channels', async () => {
-      await service.processChannels(null as GetChannelsResponseParams);
+      await service.processChannels(null as unknown as GetChannelsResponseParams);
       expect(mockPrismaService.channel.upsert).not.toHaveBeenCalled();
     });
 
     it('should process single channel', async () => {
-      const mockChannel: GetChannelsResponseParams[0] = {
+      const mockChannel: RPCChannelUpdateWithWallet = {
         channelId: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
         participant: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
         status: 'Open' as any,
@@ -58,7 +58,7 @@ describe('ChannelService', () => {
         chainId: 1,
         adjudicator: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
         challenge: 123,
-        nonce: BigInt(1),
+        nonce: 1,
         version: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -66,7 +66,7 @@ describe('ChannelService', () => {
 
       mockPrismaService.channel.upsert.mockResolvedValue(mockChannel as any);
 
-      await service.processChannels([mockChannel]);
+      await service.processChannels({ channels: [mockChannel] });
 
       expect(mockPrismaService.channel.upsert).toHaveBeenCalledTimes(1);
       expect(mockPrismaService.channel.upsert).toHaveBeenCalledWith({
@@ -81,7 +81,7 @@ describe('ChannelService', () => {
           chain_id: 1,
           adjudicator: '0x1234567890abcdef1234567890abcdef12345678',
           challenge: 123,
-          nonce: BigInt(1),
+          nonce: 1,
           version: 1,
         },
         update: {
@@ -94,14 +94,14 @@ describe('ChannelService', () => {
           chain_id: 1,
           adjudicator: '0x1234567890abcdef1234567890abcdef12345678',
           challenge: 123,
-          nonce: BigInt(1),
+          nonce: 1,
           version: 1,
         },
       });
     });
 
     it('should process multiple channels', async () => {
-      const mockChannels: GetChannelsResponseParams = [
+      const mockChannels: RPCChannelUpdateWithWallet[] = [
         {
           channelId: '0x1111111111111111111111111111111111111111' as `0x${string}`,
           participant: '0x2222222222222222222222222222222222222222' as `0x${string}`,
@@ -112,7 +112,7 @@ describe('ChannelService', () => {
           chainId: 1,
           adjudicator: '0x5555555555555555555555555555555555555555' as `0x${string}`,
           challenge: 123,
-          nonce: BigInt(1),
+          nonce: 1,
           version: 1,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -127,7 +127,7 @@ describe('ChannelService', () => {
           chainId: 1,
           adjudicator: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`,
           challenge: 456,
-          nonce: BigInt(2),
+          nonce: 2,
           version: 2,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -138,7 +138,7 @@ describe('ChannelService', () => {
         .spyOn(prismaService.channel, 'upsert')
         .mockImplementation(() => Promise.resolve({} as any));
 
-      await service.processChannels(mockChannels);
+      await service.processChannels({ channels: mockChannels });
 
       expect(mockPrismaService.channel.upsert).toHaveBeenCalledTimes(2);
     });

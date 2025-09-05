@@ -8,30 +8,32 @@ export class ChannelService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  public async processChannels(channels: GetChannelsResponseParams): Promise<void> {
-    if (!channels || channels.length === 0) return;
+  public async processChannels(channelsResponse: GetChannelsResponseParams): Promise<void> {
+    if (!channelsResponse || !channelsResponse.channels || channelsResponse.channels.length === 0)
+      return;
 
     const startTime = Date.now();
 
     this.logger.log('Processing channel batch', {
       component: 'ChannelService',
       operation: 'process_channels',
-      batchSize: channels.length,
+      batchSize: channelsResponse.channels.length,
       startTime: new Date().toISOString(),
     });
 
-    for (const channel of channels) {
+    for (const channel of channelsResponse.channels) {
       const dataToUpsert = {
         channel_id: channel.channelId,
         participant: channel.participant,
         status: channel.status,
         token: channel.token,
         wallet: channel.wallet,
-        amount: channel.amount as bigint,
+        amount:
+          typeof channel.amount === 'bigint' ? channel.amount : BigInt(channel.amount.toString()),
         chain_id: channel.chainId,
         adjudicator: channel.adjudicator,
         challenge: channel.challenge,
-        nonce: channel.nonce as bigint,
+        nonce: BigInt(channel.nonce),
         version: channel.version,
       };
 
@@ -54,9 +56,9 @@ export class ChannelService {
     this.logger.log('Channel batch processing completed', {
       component: 'ChannelService',
       operation: 'process_channels',
-      batchSize: channels.length,
+      batchSize: channelsResponse.channels.length,
       duration: `${duration}ms`,
-      averagePerChannel: `${Math.round(duration / channels.length)}ms`,
+      averagePerChannel: `${Math.round(duration / channelsResponse.channels.length)}ms`,
     });
   }
 }
