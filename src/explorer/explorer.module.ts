@@ -10,6 +10,8 @@ import { AppSessionService } from './app-session/app-session.service';
 import { AppSessionController } from './app-session/app-session.controller';
 import { NodeService } from './node/node.service';
 import { NodeController } from './node/node.controller';
+import { NodeConfigService } from './node-config/node-config.service';
+import { NodeConfigController } from './node-config/node-config.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -19,7 +21,8 @@ import { NodeController } from './node/node.controller';
     NetworkController,
     AppSessionController,
     NodeController,
+    NodeConfigController,
   ],
-  providers: [ChannelService, AssetService, NetworkService, AppSessionService, NodeService],
+  providers: [ChannelService, AssetService, NetworkService, AppSessionService, NodeService, NodeConfigService],
 })
 export class ExplorerModule {}
