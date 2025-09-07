@@ -119,4 +119,152 @@ export class ChannelService {
 
     return { total };
   }
+
+  async getByWallet(wallet: string, query: ListChannelsQueryDto) {
+    const where: Prisma.ChannelWhereInput = {
+      wallet,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.token ? { token: query.token } : {}),
+      ...(query.chainId ? { chain_id: BigInt(query.chainId) } : {}),
+    };
+
+    const orderBy: Prisma.ChannelOrderByWithRelationInput = {
+      [query.sortBy ?? 'updated_at']: query.order ?? 'desc',
+    };
+
+    const offset = (query.page - 1) * query.limit;
+    const [items, total, participantData] = await this.prisma.$transaction([
+      this.prisma.channel.findMany({
+        where,
+        orderBy,
+        skip: offset,
+        take: query.limit,
+        include: {
+          asset: {
+            select: {
+              symbol: true,
+              decimals: true,
+            },
+          },
+        },
+      }),
+      this.prisma.channel.count({ where }),
+      this.prisma.channel.findMany({
+        where: { wallet },
+        select: { participant: true },
+        distinct: ['participant'],
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / query.limit);
+
+    // Transform BigInts to strings for JSON serialization
+    const serializedItems = items.map((item) => ({
+      ...item,
+      chain_id: item.chain_id.toString(),
+      amount: item.amount.toString(),
+      challenge: item.challenge.toString(),
+      nonce: item.nonce.toString(),
+      version: item.version.toString(),
+      asset: item.asset
+        ? {
+            symbol: item.asset.symbol,
+            decimals: item.asset.decimals.toString(),
+          }
+        : null,
+    }));
+
+    return {
+      items: serializedItems,
+      participants: participantData.map(p => p.participant),
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages,
+      hasMore: query.page < totalPages,
+    };
+  }
+
+  async getByParticipant(participant: string, query: ListChannelsQueryDto) {
+    const where: Prisma.ChannelWhereInput = {
+      participant,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.token ? { token: query.token } : {}),
+      ...(query.chainId ? { chain_id: BigInt(query.chainId) } : {}),
+    };
+
+    const orderBy: Prisma.ChannelOrderByWithRelationInput = {
+      [query.sortBy ?? 'updated_at']: query.order ?? 'desc',
+    };
+
+    const offset = (query.page - 1) * query.limit;
+    const [items, total, walletData] = await this.prisma.$transaction([
+      this.prisma.channel.findMany({
+        where,
+        orderBy,
+        skip: offset,
+        take: query.limit,
+        include: {
+          asset: {
+            select: {
+              symbol: true,
+              decimals: true,
+            },
+          },
+        },
+      }),
+      this.prisma.channel.count({ where }),
+      this.prisma.channel.findFirst({
+        where: { participant },
+        select: { wallet: true },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / query.limit);
+
+    // Transform BigInts to strings for JSON serialization
+    const serializedItems = items.map((item) => ({
+      ...item,
+      chain_id: item.chain_id.toString(),
+      amount: item.amount.toString(),
+      challenge: item.challenge.toString(),
+      nonce: item.nonce.toString(),
+      version: item.version.toString(),
+      asset: item.asset
+        ? {
+            symbol: item.asset.symbol,
+            decimals: item.asset.decimals.toString(),
+          }
+        : null,
+    }));
+
+    return {
+      items: serializedItems,
+      wallet: walletData?.wallet,
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages,
+      hasMore: query.page < totalPages,
+    };
+  }
+
+  async getByAddress(address: string, query: ListChannelsQueryDto) {
+    console.log(`[getByAddress] Called with address: ${address}`);
+    
+    // First try as wallet
+    const asWallet = await this.getByWallet(address, query);
+    console.log(`[getByAddress] Wallet result: ${asWallet.items.length} items`);
+    if (asWallet.items.length > 0) {
+      const result = { ...asWallet, lookupType: 'wallet' as const };
+      console.log(`[getByAddress] Returning wallet result with ${result.participants.length} participants`);
+      return result;
+    }
+
+    // Then try as participant
+    const asParticipant = await this.getByParticipant(address, query);
+    const result = { ...asParticipant, lookupType: 'participant' as const };
+    console.log(`[getByAddress] Returning participant result`);
+    return result;
+  }
 }

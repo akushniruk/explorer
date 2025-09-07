@@ -194,6 +194,136 @@ Get the total count of channels matching the filters.
 }
 ```
 
+#### `GET /api/v1/channel/wallet/:address`
+Get channels by wallet address (main account) with participant information.
+
+**Path Parameters:**
+- `address`: Wallet address to search for
+
+**Query Parameters:**
+- All standard filtering parameters from `/api/v1/channel/list`
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 25)
+- `status` (optional): Filter by channel status
+- `token` (optional): Filter by token address
+- `chainId` (optional): Filter by chain ID
+- `sortBy` (optional): Sort field (`updated_at`, `created_at`, `amount`) (default: `updated_at`)
+- `order` (optional): Sort order (`asc`, `desc`) (default: `desc`)
+
+**Rate Limit:** 60 requests per minute  
+**Cache:** 5 seconds
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "channel_id": "0x123...",
+        "wallet": "0xwallet...",
+        "participant": "0xsession1...",
+        // ... other channel fields
+      }
+    ],
+    "participants": ["0xsession1...", "0xsession2..."],
+    "page": 1,
+    "limit": 25,
+    "total": 10,
+    "totalPages": 1,
+    "hasMore": false
+  }
+}
+```
+
+#### `GET /api/v1/channel/participant/:address`
+Get channels by participant address (session key) with wallet information.
+
+**Path Parameters:**
+- `address`: Participant/session key address to search for
+
+**Query Parameters:**
+- All standard filtering parameters from `/api/v1/channel/list`
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 25)
+- `status` (optional): Filter by channel status
+- `token` (optional): Filter by token address
+- `chainId` (optional): Filter by chain ID
+- `sortBy` (optional): Sort field (`updated_at`, `created_at`, `amount`) (default: `updated_at`)
+- `order` (optional): Sort order (`asc`, `desc`) (default: `desc`)
+
+**Rate Limit:** 60 requests per minute  
+**Cache:** 5 seconds
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "channel_id": "0x123...",
+        "wallet": "0xwallet...",
+        "participant": "0xsession1...",
+        // ... other channel fields
+      }
+    ],
+    "wallet": "0xwallet...",
+    "page": 1,
+    "limit": 25,
+    "total": 5,
+    "totalPages": 1,
+    "hasMore": false
+  }
+}
+```
+
+#### `GET /api/v1/channel/address/:address`
+Universal address lookup - automatically determines if address is a wallet or participant.
+
+**Path Parameters:**
+- `address`: Address to search for (wallet or participant)
+
+**Query Parameters:**
+- All standard filtering parameters from `/api/v1/channel/list`
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 25)
+- `status` (optional): Filter by channel status
+- `token` (optional): Filter by token address
+- `chainId` (optional): Filter by chain ID
+- `sortBy` (optional): Sort field (`updated_at`, `created_at`, `amount`) (default: `updated_at`)
+- `order` (optional): Sort order (`asc`, `desc`) (default: `desc`)
+
+**Rate Limit:** 60 requests per minute  
+**Cache:** 5 seconds
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "channel_id": "0x123...",
+        "wallet": "0xwallet...",
+        "participant": "0xsession1...",
+        // ... other channel fields
+      }
+    ],
+    "lookupType": "wallet",
+    "participants": ["0xsession1...", "0xsession2..."],
+    // OR for participant lookup:
+    // "lookupType": "participant",
+    // "wallet": "0xwallet...",
+    "page": 1,
+    "limit": 25,
+    "total": 10,
+    "totalPages": 1,
+    "hasMore": false
+  }
+}
+```
+
 ### Assets
 
 Assets represent tokens across different blockchain networks.

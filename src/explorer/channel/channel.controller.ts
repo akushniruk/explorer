@@ -36,6 +36,33 @@ export class ChannelController {
     return this.svc.count(q);
   }
 
+  /** Get channels by wallet (includes participant list) */
+  @Get('wallet/:address')
+  @EtagResource('channels')
+  @Throttle({ default: { limit: 60, ttl: 60 } })
+  @Header('Cache-Control', 'public, max-age=5')
+  getByWallet(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
+    return this.svc.getByWallet(address, q);
+  }
+
+  /** Get channels by participant (session key) */
+  @Get('participant/:address')
+  @EtagResource('channels')
+  @Throttle({ default: { limit: 60, ttl: 60 } })
+  @Header('Cache-Control', 'public, max-age=5')
+  getByParticipant(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
+    return this.svc.getByParticipant(address, q);
+  }
+
+  /** Universal lookup - checks if address is wallet or participant */
+  @Get('address/:address')
+  @EtagResource('channels')
+  @Throttle({ default: { limit: 60, ttl: 60 } })
+  @Header('Cache-Control', 'public, max-age=5')
+  getByAddress(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
+    return this.svc.getByAddress(address, q);
+  }
+
   /** Convenience: single channel by path */
   @Get('/:id')
   @EtagResource('channels')

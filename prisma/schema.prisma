@@ -30,6 +30,8 @@ model Channel {
 
   @@index([wallet])
   @@index([participant])
+  @@index([wallet, participant])
+  @@index([participant, wallet])
   @@index([token, chain_id])
   @@index([status, updated_at])
   @@index([created_at])

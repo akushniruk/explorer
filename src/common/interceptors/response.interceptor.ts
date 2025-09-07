@@ -20,22 +20,24 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
 
         // Handle paginated responses
         if (this.isPaginatedResponse(data)) {
+          // Extract pagination fields
+          const { items, page, limit, total, totalPages, ...otherFields } = data;
+          
           return {
             success: true,
-
-            data: data.items,
+            data: {
+              items,
+              ...otherFields, // Preserve additional fields like participants, lookupType, wallet
+            },
             meta: {
               timestamp,
               requestId,
               version: process.env.npm_package_version || '1.0.0',
               pagination: {
-                page: data.page,
-
-                limit: data.limit,
-
-                total: data.total,
-
-                totalPages: data.totalPages,
+                page,
+                limit,
+                total,
+                totalPages,
               },
             },
           };
