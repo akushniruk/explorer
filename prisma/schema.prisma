@@ -169,6 +169,7 @@ model Node {
 
   status       String    @default("unknown") // online|degraded|offline|unknown
   available    Boolean   @default(false)
+  featured     Boolean   @default(false) // certified/featured nodes like WalletConnect
   latency_ms   Int?
   last_seen_at DateTime?
 
@@ -179,6 +180,7 @@ model Node {
   @@index([region])
   @@index([country_code])
   @@index([status, updated_at])
+  @@index([featured])
   @@index([latitude, longitude])
   @@index([updated_at])
   @@map("nodes")
