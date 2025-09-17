@@ -176,7 +176,7 @@ export class ChannelService {
 
     return {
       items: serializedItems,
-      participants: participantData.map(p => p.participant),
+      participants: participantData.map((p) => p.participant),
       page: query.page,
       limit: query.limit,
       total,
@@ -251,20 +251,28 @@ export class ChannelService {
 
   async getByAddress(address: string, query: ListChannelsQueryDto) {
     console.log(`[getByAddress] Called with address: ${address}`);
-    
+
     // First try as wallet
     const asWallet = await this.getByWallet(address, query);
+
     console.log(`[getByAddress] Wallet result: ${asWallet.items.length} items`);
+
     if (asWallet.items.length > 0) {
       const result = { ...asWallet, lookupType: 'wallet' as const };
-      console.log(`[getByAddress] Returning wallet result with ${result.participants.length} participants`);
+
+      console.log(
+        `[getByAddress] Returning wallet result with ${result.participants.length} participants`,
+      );
+
       return result;
     }
 
     // Then try as participant
     const asParticipant = await this.getByParticipant(address, query);
     const result = { ...asParticipant, lookupType: 'participant' as const };
+
     console.log(`[getByAddress] Returning participant result`);
+
     return result;
   }
 }

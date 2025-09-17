@@ -23,6 +23,13 @@ import { NodeConfigController } from './node-config/node-config.controller';
     NodeController,
     NodeConfigController,
   ],
-  providers: [ChannelService, AssetService, NetworkService, AppSessionService, NodeService, NodeConfigService],
+  providers: [
+    ChannelService,
+    AssetService,
+    NetworkService,
+    AppSessionService,
+    NodeService,
+    NodeConfigService,
+  ],
 })
 export class ExplorerModule {}

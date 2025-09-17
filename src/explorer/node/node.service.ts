@@ -7,6 +7,7 @@ type NodeView = {
   slug: string;
   name: string;
   ws_url: string;
+  address: string | null;
   website_host: string | null;
   icon_key: string | null;
   description: string | null;
@@ -26,6 +27,7 @@ function serialize(node: DbNode): NodeView {
     slug: node.slug,
     name: node.name,
     ws_url: node.ws_url,
+    address: node.address ?? null,
     website_host: node.website_host ?? null,
     icon_key: node.icon_key ?? null,
     description: node.description ?? null,
@@ -160,5 +162,26 @@ export class NodeService {
     });
 
     return { total };
+  }
+
+  async findByAddress(address: string) {
+    if (!address) {
+      throw new Error('Address parameter is required');
+    }
+
+    const node = await this.prisma.node.findFirst({
+      where: {
+        address: {
+          equals: address,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (!node) {
+      throw new Error('Node not found');
+    }
+
+    return serialize(node);
   }
 }

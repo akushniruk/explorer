@@ -22,7 +22,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
         if (this.isPaginatedResponse(data)) {
           // Extract pagination fields
           const { items, page, limit, total, totalPages, ...otherFields } = data;
-          
+
           return {
             success: true,
             data: {

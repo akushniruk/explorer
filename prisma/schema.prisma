@@ -157,6 +157,7 @@ model Node {
   name        String
   ws_url      String  @db.Text // public WS endpoint to connect
   description String? @db.Text
+  address     String? @db.VarChar(255) // node address for frontend lookup
 
   website_host String? @db.VarChar(255) // e.g. "app.io"
   icon_key     String? @db.VarChar(128) // e.g. "app" (frontend/CDN asset key)

@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Query } from '@nestjs/common';
+import { Controller, Get, Header, Param, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { NodeService } from './node.service';
 import { ListNodesQueryDto } from './dto/list-nodes.dto';
@@ -39,5 +39,13 @@ export class NodeController {
   @Header('Cache-Control', 'public, max-age=30')
   countActive() {
     return this.svc.countActive();
+  }
+
+  /** Get node by address */
+  @Get(':address')
+  @Throttle({ default: { limit: 120, ttl: 60 } })
+  @Header('Cache-Control', 'public, max-age=30')
+  findByAddress(@Param('address') address: string) {
+    return this.svc.findByAddress(address);
   }
 }

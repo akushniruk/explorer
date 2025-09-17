@@ -7,7 +7,7 @@ export class NodeConfigService {
 
   async getConfig() {
     const config = await this.prisma.nodeConfig.findFirst();
-    
+
     if (!config) {
       throw new NotFoundException('NodeConfig not found');
     }
