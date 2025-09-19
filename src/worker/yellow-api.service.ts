@@ -23,8 +23,6 @@ import { ConfigType } from '@nestjs/config';
 
 const mockSigner: MessageSigner = () => Promise.resolve('0x');
 
-type PaginationOptions = { limit: number; offset: number; sort: 'asc' | 'desc' };
-
 type PendingEntry = {
   expected: Set<RPCMethod>;
   resolve: (resp: RPCResponse) => void;
@@ -73,11 +71,44 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
     )) as GetConfigResponse;
   }
 
-  public async getChannels(options: PaginationOptions): Promise<GetChannelsResponse> {
+  public async getChannels(
+    options: {
+      participant?: `0x${string}`;
+      status?: RPCChannelStatus;
+      offset?: number;
+      limit?: number;
+      sort?: 'asc' | 'desc';
+    } = {},
+  ): Promise<GetChannelsResponse> {
+    const baseJson = await createGetChannelsMessage(mockSigner);
+    const msg = JSON.parse(baseJson) as NitroliteRPCMessage;
+
+    // Patch the message to include all the options - always set offset and limit explicitly
+    if (msg?.req?.[2] && typeof msg.req[2] === 'object') {
+      const params = msg.req[2] as any;
+
+      if (options.participant !== undefined) {
+        params.participant = options.participant;
+      }
+
+      if (options.status !== undefined) {
+        params.status = options.status;
+      }
+
+      // Always set offset and limit explicitly
+      params.offset = options.offset ?? 0;
+      params.limit = options.limit ?? 100;
+
+      if (options.sort !== undefined) {
+        params.sort = options.sort;
+      }
+    }
+
+    const finalJson = JSON.stringify(msg);
+
     return (await this.sendRequest<RPCMethod.GetChannels>(
-      (s) => createGetChannelsMessage(s),
+      () => Promise.resolve(finalJson),
       RPCMethod.GetChannels,
-      options,
     )) as GetChannelsResponse;
   }
 
@@ -93,26 +124,37 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
    * backend allows empty participant ('') to mean "all sessions". We build the
    * message with a placeholder and patch the payload to allow '' plus pagination.
    */
-  public async getAppSessions(opts?: {
-    participant?: `0x${string}` | ''; // '' => all sessions
-    status?: RPCChannelStatus;
-    pagination?: PaginationOptions;
-  }): Promise<GetAppSessionsResponse> {
+  public async getAppSessions(
+    opts: {
+      participant?: `0x${string}` | ''; // '' => all sessions
+      status?: RPCChannelStatus;
+      offset?: number;
+      limit?: number;
+      sort?: 'asc' | 'desc';
+    } = {},
+  ): Promise<GetAppSessionsResponse> {
     const placeholder: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
     const baseJson = await createGetAppSessionsMessage(mockSigner, placeholder, opts?.status);
 
     const msg = JSON.parse(baseJson) as NitroliteRPCMessage;
 
-    if (msg?.req?.[2] && typeof msg.req[2][0] === 'object') {
-      const p = (opts?.participant ?? '') as any; // allow empty string => all
+    if (msg?.req?.[2] && typeof msg.req[2] === 'object') {
+      const params = msg.req[2] as any;
 
-      (msg.req[2][0] as any).participant = p;
+      // Set participant - allow empty string for "all sessions"
+      params.participant = opts?.participant ?? '';
 
-      if (opts?.pagination) {
-        const { limit, offset, sort } = opts.pagination;
+      if (opts?.status !== undefined) {
+        params.status = opts.status;
+      }
 
-        Object.assign(msg.req[2][0] as any, { limit, offset, sort });
+      // Always set offset and limit explicitly
+      params.offset = opts?.offset ?? 0;
+      params.limit = opts?.limit ?? 1000;
+
+      if (opts?.sort !== undefined) {
+        params.sort = opts.sort;
       }
     }
 
@@ -243,7 +285,7 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
         response = parseAnyRPCResponse(rawData);
       } catch (err) {
         // Generic parser failed, use loose response
-        this.logger.warn('Response parsing failed; using loose response', {
+        this.logger.debug('Response parsing failed; using loose response', {
           component: 'YellowApiService',
           method,
           error: (err as Error)?.message ?? String(err),
@@ -292,25 +334,17 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   private async sendRequest<TM extends RPCMethod>(
     createMessageFn: (signer: MessageSigner) => Promise<string>,
     expectedMethod: TM,
-    paginationOptions?: PaginationOptions,
   ): Promise<RPCResponse> {
     // ensure socket is open (configurable wait)
     await this.waitUntilOpen(this.cfg.wsRequestTimeoutMs ?? 5_000);
 
-    const baseRequestJson = await createMessageFn(mockSigner);
-    const message = JSON.parse(baseRequestJson) as NitroliteRPCMessage;
+    const finalRequestJson = await createMessageFn(mockSigner);
+    const message = JSON.parse(finalRequestJson) as NitroliteRPCMessage;
 
     if (!message?.req) {
       throw new Error('Invalid message format received from SDK');
     }
 
-    if (paginationOptions) {
-      if (message.req[2] && typeof message.req[2][0] === 'object') {
-        Object.assign(message.req[2][0], paginationOptions);
-      }
-    }
-
-    const finalRequestJson = JSON.stringify(message);
     const requestId = message.req[0];
 
     this.logger.debug('Sending RPC request to Yellow API', {
@@ -389,11 +423,33 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
         if (Array.isArray(p) && Array.isArray(p[0])) {
           // Legacy format: [[ {...}, ... ]]
           p = { appSessions: p[0] };
-        } else if (Array.isArray(p) && !('appSessions' in (p as any))) {
+        } else if (
+          Array.isArray(p) &&
+          !('appSessions' in (p as any)) &&
+          !('app_sessions' in (p as any))
+        ) {
           // Direct array format: [ {...}, ... ]
           p = { appSessions: p };
+        } else if (p && typeof p === 'object') {
+          // Handle both camelCase and snake_case
+          if ('appSessions' in p) {
+            // Already correct format
+            // Keep as is
+          } else if ('app_sessions' in p) {
+            // Convert snake_case to camelCase
+            p = { appSessions: p.app_sessions };
+          } else {
+            // Try to find appSessions data elsewhere in the response
+            this.logger.warn('Could not find app sessions in expected location', {
+              responseKeys: Object.keys(obj),
+              res2Keys: Object.keys(p),
+            });
+            p = { appSessions: [] };
+          }
+        } else {
+          // Not an object, set empty
+          p = { appSessions: [] };
         }
-        // Otherwise assume it's already in correct { appSessions: [...] } format
       }
 
       params = p;

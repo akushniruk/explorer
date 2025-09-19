@@ -38,8 +38,8 @@ export class AppSessionService {
    * Tolerant to SDK parse failures (we normalize shape ourselves).
    */
   async syncAllWithBudget(): Promise<{ count: number }> {
-    const limit = Number(this.cfg?.sync?.appSessionsPageSize ?? 100);
-    const budgetMs = Number(this.cfg?.sync?.appSessionsBudgetMs ?? 10_000);
+    const limit = Number(this.cfg?.sync?.appSessionsPageSize ?? 1000);
+    const budgetMs = Number(this.cfg?.sync?.appSessionsBudgetMs ?? 60_000);
     const started = Date.now();
 
     let offset = 0;
@@ -49,10 +49,24 @@ export class AppSessionService {
       let res: GetAppSessionsResponse;
 
       try {
-        res = await this.yellow.getAppSessions({
-          participant: '', // empty => “all sessions”
-          pagination: { limit, offset, sort: 'desc' },
-        });
+        // Try with null/undefined participant first, then empty string fallback
+        try {
+          res = await this.yellow.getAppSessions({
+            limit,
+            offset,
+            sort: 'desc',
+          });
+        } catch (firstError) {
+          this.logger.debug('First app sessions call failed, trying with empty participant', {
+            error: (firstError as Error).message,
+          });
+          res = await this.yellow.getAppSessions({
+            participant: '', // empty => "all sessions"
+            limit,
+            offset,
+            sort: 'desc',
+          });
+        }
       } catch (e) {
         this.logger.warn('Upstream error fetching app sessions; aborting this cycle', {
           error: (e as Error).message,
@@ -197,6 +211,7 @@ export class AppSessionService {
   private async process(items: RPCAppSession[]): Promise<void> {
     const rows = items.map((s) => {
       const created = s.createdAt ?? null;
+      const updated = s.updatedAt ?? null;
 
       return {
         session_id: s.appSessionId,
@@ -207,10 +222,11 @@ export class AppSessionService {
         version: BigInt(this.num(s.version)),
         nonce: BigInt(this.num(s.nonce)),
         status: String(s.status ?? 'unknown'),
-        channel_id: '', // RPC doesn’t link channel
+        channel_id: '', // RPC doesn't link channel
         challenge: BigInt(this.num(s.challenge)),
         session_data: s.sessionData ?? null,
-        created_at: created, // conditionally applied below
+        created_at: created,
+        updated_at: updated,
       };
     });
 
@@ -233,24 +249,36 @@ export class AppSessionService {
             session_data: r.session_data,
           };
 
+          // Preserve original timestamps from API
           if (this.isValidDate(r.created_at)) {
             createBase.created_at = r.created_at;
+          }
+
+          if (this.isValidDate(r.updated_at)) {
+            createBase.updated_at = r.updated_at;
+          }
+
+          const updateBase: any = {
+            protocol: r.protocol,
+            participants: r.participants,
+            weight: r.weight,
+            quorum: r.quorum,
+            version: r.version,
+            nonce: r.nonce,
+            status: r.status,
+            challenge: r.challenge,
+            session_data: r.session_data,
+          };
+
+          // Preserve updated_at from API in updates too
+          if (this.isValidDate(r.updated_at)) {
+            updateBase.updated_at = r.updated_at;
           }
 
           return this.prisma.appSession.upsert({
             where: { session_id: r.session_id },
             create: createBase,
-            update: {
-              protocol: r.protocol,
-              participants: r.participants,
-              weight: r.weight,
-              quorum: r.quorum,
-              version: r.version,
-              nonce: r.nonce,
-              status: r.status,
-              challenge: r.challenge,
-              session_data: r.session_data,
-            },
+            update: updateBase,
           });
         }),
       );

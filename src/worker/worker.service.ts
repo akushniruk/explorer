@@ -228,14 +228,19 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
       if (offset === 0) {
         const top = channelsResponse.channels[0];
+        // API returns snake_case, handle both formats for compatibility
+        const createdAt = (top as any).created_at || top.createdAt;
+        const channelId = (top as any).channel_id || top.channelId;
 
-        newestCursor = { t: new Date(top.createdAt).getTime(), id: top.channelId };
+        if (createdAt && channelId) {
+          newestCursor = { t: new Date(createdAt).getTime(), id: channelId };
+        }
       }
 
       await this.channelService.processChannels(channelsResponse);
       totalChannelsProcessed += channelsResponse.channels.length;
 
-      if (channelsResponse.channels.length < limit) break;
+      if (channelsResponse.channels.length === 0) break;
 
       offset += limit;
 
@@ -306,15 +311,26 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
       const page =
         respParams.channels.filter((c) => {
-          const t = new Date(c.createdAt).getTime();
+          // API returns snake_case, handle both formats for compatibility
+          const createdAt = (c as any).created_at || c.createdAt;
+          const channelId = (c as any).channel_id || c.channelId;
 
-          return compareCursor({ t, id: c.channelId }, cur) > 0;
+          if (!createdAt || !channelId) return false;
+
+          const t = new Date(createdAt).getTime();
+
+          return compareCursor({ t, id: channelId }, cur) > 0;
         }) || [];
 
       if (page.length > 0 && !nextCursor) {
         const top = page[0];
+        // API returns snake_case, handle both formats for compatibility
+        const createdAt = (top as any).created_at || top.createdAt;
+        const channelId = (top as any).channel_id || top.channelId;
 
-        nextCursor = { t: new Date(top.createdAt).getTime(), id: top.channelId };
+        if (createdAt && channelId) {
+          nextCursor = { t: new Date(createdAt).getTime(), id: channelId };
+        }
       }
 
       allNewChannels.channels.push(...page);
