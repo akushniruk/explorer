@@ -13,8 +13,12 @@ COPY prisma ./prisma
 # Build stage
 FROM base AS build
 
+# Set npm configuration to avoid @swc/core postinstall issues
+ENV SKIP_SWCRC=1
+ENV DISABLE_SWC_BINARY=1
+
 # Install all dependencies (including dev for Prisma)
-RUN npm install
+RUN npm install --no-optional --frozen-lockfile
 
 # Copy source code
 COPY . .
