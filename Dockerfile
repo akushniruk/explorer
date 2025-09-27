@@ -51,5 +51,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/v1/health || exit 1
 
-# Start the API application by default
-CMD ["node", "dist/src/main.js"]
+# Run migrations only if AUTO_MIGRATE=true, then start API
+CMD ["sh", "-c", "if [ \"$AUTO_MIGRATE\" = \"true\" ]; then npx prisma migrate deploy; fi && node dist/src/main.js"]

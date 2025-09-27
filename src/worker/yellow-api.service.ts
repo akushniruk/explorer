@@ -314,6 +314,7 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
           requestId,
           expected: [...entry.expected],
           got: response.method,
+          ...(response.method === 'error' && { errorDetails: response.params }),
         });
       }
 

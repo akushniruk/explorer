@@ -52,5 +52,5 @@ USER nestjs
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD pgrep -f "node dist/src/worker.js" > /dev/null || exit 1
 
-# Start the worker application
-CMD ["pnpm", "run", "start:worker"]
+# Run migrations if needed and start the worker application
+CMD ["sh", "-c", "if [ \"$AUTO_MIGRATE\" = \"true\" ]; then npx prisma migrate deploy; fi && pnpm run start:worker"]
