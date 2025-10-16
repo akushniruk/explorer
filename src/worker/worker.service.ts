@@ -11,34 +11,15 @@ import { AssetService } from './asset/asset.service';
 import { HealthService } from './health/health.service';
 import { AppSessionService } from './app-session/app-session.service';
 
-const WORKER_STATE_KEY = 'channels:last_ts';
 const JOB_ID = 'channels-sync';
-
-type ChannelCursor = { t: number; id: string }; // ms + channelId
-const encodeCursor = (c: ChannelCursor) => `${c.t}:${c.id}`;
-const decodeCursor = (s: string): ChannelCursor => {
-  const i = s.indexOf(':');
-
-  if (i <= 0) throw new Error(`Bad cursor format: ${s}`);
-
-  const t = Number(s.slice(0, i));
-  const id = s.slice(i + 1);
-
-  if (!Number.isFinite(t)) throw new Error(`Bad cursor timestamp: ${s}`);
-
-  return { t, id };
-};
-const compareCursor = (a: ChannelCursor, b: ChannelCursor) =>
-  a.t !== b.t ? a.t - b.t : a.id.localeCompare(b.id);
 
 @Injectable()
 export class WorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WorkerService.name);
-  private latestCursor: ChannelCursor | null = null;
-  private isInitialSyncComplete = false;
   private isSyncing = false;
   private lastAssetsSyncMs = 0;
   private lastAppSessionsSyncMs = 0;
+  private lastChannelsSyncMs = 0;
 
   constructor(
     private readonly yellowApiService: YellowApiService,
@@ -95,9 +76,14 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Initial app sessions warm-up failed: ${(e as Error).message}`);
     }
 
-    // Load persisted cursor (composite)
-    this.latestCursor = await this.loadCursor();
-    this.isInitialSyncComplete = !!this.latestCursor;
+    // Initial channels sync
+    try {
+      await this.syncChannels();
+      this.lastChannelsSyncMs = Date.now();
+      this.logger.log('Initial channels warm-up done');
+    } catch (e) {
+      this.logger.warn(`Initial channels warm-up failed: ${(e as Error).message}`);
+    }
 
     const intervalMs = Math.max(Number(this.cfg?.sync?.intervalMs ?? 90_000), 1_000);
     const batchSize = Number(this.cfg?.sync?.channelsLimit ?? 100);
@@ -107,16 +93,13 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       action: 'startup',
       syncIntervalMs: intervalMs,
       batchSize,
-      mode: this.isInitialSyncComplete ? 'incremental' : 'full',
-      cursor: this.latestCursor ? encodeCursor(this.latestCursor) : null,
+      mode: 'full-refresh',
     });
 
     const handle = setInterval(() => void this.handleSync(), intervalMs);
 
     this.scheduler.addInterval(JOB_ID, handle);
     this.logger.log(`Scheduled ${JOB_ID} every ${intervalMs}ms`);
-
-    await this.handleSync();
   }
 
   onModuleDestroy() {
@@ -131,38 +114,12 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleSync(): Promise<void> {
-    const assetsRefreshMs = Number(this.cfg?.sync?.assetsRefreshMs ?? 30 * 60 * 1000); // 30m
-
     const health = await this.healthService.check();
 
     if (health.status !== 'healthy') {
       this.logger.warn('Skipping sync: upstream unhealthy', { latencyMs: health.latencyMs });
 
       return;
-    }
-
-    if (Date.now() - this.lastAssetsSyncMs >= assetsRefreshMs) {
-      try {
-        const res = await this.assetService.syncAssets();
-
-        this.lastAssetsSyncMs = Date.now();
-        this.logger.log('Periodic assets refresh completed', { count: res.count });
-      } catch (e) {
-        this.logger.warn(`Periodic assets refresh failed: ${(e as Error).message}`);
-      }
-    }
-
-    const ttl = Number(this.cfg?.sync?.appSessionsRefreshMs ?? 300_000);
-
-    if (Date.now() - this.lastAppSessionsSyncMs >= ttl) {
-      try {
-        const res = await this.appSessionService.syncAllWithBudget();
-
-        this.lastAppSessionsSyncMs = Date.now();
-        this.logger.log('Periodic app sessions refresh completed', { count: res.count });
-      } catch (e) {
-        this.logger.warn(`Periodic app sessions refresh failed: ${(e as Error).message}`);
-      }
     }
 
     if (this.isSyncing) {
@@ -177,15 +134,50 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     this.isSyncing = true;
 
     try {
-      if (!this.isInitialSyncComplete) {
-        await this.runFullSync();
-      } else {
-        await this.runIncrementalSync();
+      // Periodic assets refresh
+      const assetsRefreshMs = Number(this.cfg?.sync?.assetsRefreshMs ?? 30 * 60 * 1000); // 30m
+
+      if (Date.now() - this.lastAssetsSyncMs >= assetsRefreshMs) {
+        try {
+          const res = await this.assetService.syncAssets();
+
+          this.lastAssetsSyncMs = Date.now();
+          this.logger.log('Periodic assets refresh completed', { count: res.count });
+        } catch (e) {
+          this.logger.warn(`Periodic assets refresh failed: ${(e as Error).message}`);
+        }
+      }
+
+      // Periodic app sessions refresh
+      const appSessionsRefreshMs = Number(this.cfg?.sync?.appSessionsRefreshMs ?? 300_000);
+
+      if (Date.now() - this.lastAppSessionsSyncMs >= appSessionsRefreshMs) {
+        try {
+          const res = await this.appSessionService.syncAllWithBudget();
+
+          this.lastAppSessionsSyncMs = Date.now();
+          this.logger.log('Periodic app sessions refresh completed', { count: res.count });
+        } catch (e) {
+          this.logger.warn(`Periodic app sessions refresh failed: ${(e as Error).message}`);
+        }
+      }
+
+      // Periodic channels refresh - always run full sync
+      const channelsRefreshMs = Number(this.cfg?.sync?.channelsRefreshMs ?? 300_000); // 5m default
+
+      if (Date.now() - this.lastChannelsSyncMs >= channelsRefreshMs) {
+        try {
+          await this.syncChannels();
+          this.lastChannelsSyncMs = Date.now();
+          this.logger.log('Periodic channels refresh completed');
+        } catch (e) {
+          this.logger.warn(`Periodic channels refresh failed: ${(e as Error).message}`);
+        }
       }
     } catch (error) {
-      this.logger.error('Channel synchronization failed', {
+      this.logger.error('Synchronization failed', {
         component: 'WorkerService',
-        operation: this.isInitialSyncComplete ? 'incremental_sync' : 'full_sync',
+        operation: 'sync',
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -193,21 +185,26 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async runFullSync(): Promise<void> {
+  /**
+   * Full refresh of all channels - fetches and upserts all channels from the API.
+   * This ensures updates to existing channels are captured, not just new ones.
+   */
+  private async syncChannels(): Promise<void> {
     const startTime = Date.now();
     const limit = Number(this.cfg?.sync?.channelsLimit ?? 100);
-    const sleepMs = Number(this.cfg?.sync?.fullSleepMs ?? 3000);
+    const budgetMs = Number(this.cfg?.sync?.channelsBudgetMs ?? 60_000); // 1 minute default
+    const sleepMs = Number(this.cfg?.sync?.channelsSleepMs ?? 1000);
 
-    this.logger.log('Started full channel synchronization', {
-      operation: 'full_sync',
+    this.logger.log('Started full channels synchronization', {
+      operation: 'channels_sync',
       batchSize: limit,
+      budgetMs,
     });
 
     let offset = 0;
-    let newestCursor: ChannelCursor | null = null;
     let totalChannelsProcessed = 0;
 
-    while (true) {
+    while (Date.now() - startTime < budgetMs) {
       let channelsResponse: GetChannelsResponseParams | undefined;
 
       try {
@@ -215,7 +212,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
         channelsResponse = response.params;
       } catch (e) {
-        this.logger.warn('Upstream unavailable during full sync; aborting this cycle', {
+        this.logger.warn('Upstream unavailable during channel sync; aborting this cycle', {
           error: (e as Error).message,
           offset,
           limit,
@@ -226,21 +223,10 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       if (!channelsResponse || !channelsResponse.channels || channelsResponse.channels.length === 0)
         break;
 
-      if (offset === 0) {
-        const top = channelsResponse.channels[0];
-        // API returns snake_case, handle both formats for compatibility
-        const createdAt = (top as any).created_at || top.createdAt;
-        const channelId = (top as any).channel_id || top.channelId;
-
-        if (createdAt && channelId) {
-          newestCursor = { t: new Date(createdAt).getTime(), id: channelId };
-        }
-      }
-
       await this.channelService.processChannels(channelsResponse);
       totalChannelsProcessed += channelsResponse.channels.length;
 
-      if (channelsResponse.channels.length === 0) break;
+      if (channelsResponse.channels.length < limit) break;
 
       offset += limit;
 
@@ -249,158 +235,10 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     const duration = Date.now() - startTime;
 
-    if (newestCursor) {
-      await this.saveCursor(newestCursor);
-      this.latestCursor = newestCursor;
-      this.isInitialSyncComplete = true;
-    } else {
-      this.isInitialSyncComplete = false;
-    }
-
-    this.logger.log('Full channel synchronization completed', {
-      operation: 'full_sync',
+    this.logger.log('Full channels synchronization completed', {
+      operation: 'channels_sync',
       channelsProcessed: totalChannelsProcessed,
       durationMs: duration,
-      latestCursor: this.latestCursor ? encodeCursor(this.latestCursor) : null,
     });
-  }
-
-  private async runIncrementalSync(): Promise<void> {
-    const limit = Number(this.cfg?.sync?.channelsLimit ?? 100);
-
-    if (!this.latestCursor) {
-      this.logger.error('Incremental sync prerequisite not met', {
-        component: 'WorkerService',
-        operation: 'incremental_sync',
-        error: 'Missing cursor; initial sync must complete first',
-        isInitialSyncComplete: this.isInitialSyncComplete,
-      });
-
-      return;
-    }
-
-    const cur = this.latestCursor;
-    const startTime = Date.now();
-    const allNewChannels: GetChannelsResponseParams = { channels: [] };
-
-    this.logger.log('Started incremental channel synchronization', {
-      operation: 'incremental_sync',
-      lastCursor: encodeCursor(cur),
-    });
-
-    let offset = 0;
-    let nextCursor: ChannelCursor | null = null;
-
-    while (true) {
-      let respParams: GetChannelsResponseParams | undefined;
-
-      try {
-        const response = await this.yellowApiService.getChannels({ limit, offset, sort: 'desc' });
-
-        respParams = response.params;
-      } catch (e) {
-        this.logger.warn('Upstream unavailable during incremental sync; aborting this cycle', {
-          error: (e as Error).message,
-          offset,
-          limit,
-        });
-        break;
-      }
-
-      if (!respParams || !respParams.channels || respParams.channels.length === 0) break;
-
-      const page =
-        respParams.channels.filter((c) => {
-          // API returns snake_case, handle both formats for compatibility
-          const createdAt = (c as any).created_at || c.createdAt;
-          const channelId = (c as any).channel_id || c.channelId;
-
-          if (!createdAt || !channelId) return false;
-
-          const t = new Date(createdAt).getTime();
-
-          return compareCursor({ t, id: channelId }, cur) > 0;
-        }) || [];
-
-      if (page.length > 0 && !nextCursor) {
-        const top = page[0];
-        // API returns snake_case, handle both formats for compatibility
-        const createdAt = (top as any).created_at || top.createdAt;
-        const channelId = (top as any).channel_id || top.channelId;
-
-        if (createdAt && channelId) {
-          nextCursor = { t: new Date(createdAt).getTime(), id: channelId };
-        }
-      }
-
-      allNewChannels.channels.push(...page);
-
-      if (respParams.channels.length < limit || page.length === 0) break;
-
-      offset += limit;
-    }
-
-    const duration = Date.now() - startTime;
-
-    if (allNewChannels.channels.length > 0 && nextCursor) {
-      this.logger.log('Incremental channel synchronization completed', {
-        operation: 'incremental_sync',
-        newChannels: allNewChannels.channels.length,
-        durationMs: duration,
-        latestCursor: encodeCursor(nextCursor),
-      });
-
-      await this.channelService.processChannels(allNewChannels);
-      await this.saveCursor(nextCursor);
-      this.latestCursor = nextCursor;
-    } else {
-      this.logger.log('Incremental synchronization completed with no new channels', {
-        operation: 'incremental_sync',
-        newChannels: 0,
-        durationMs: duration,
-        lastCursor: encodeCursor(cur),
-      });
-    }
-  }
-
-  // ---------- cursor persistence ----------
-
-  private async loadCursor(): Promise<ChannelCursor | null> {
-    try {
-      const row = await this.prisma.workerState.findUnique({ where: { id: WORKER_STATE_KEY } });
-
-      if (!row) return null;
-
-      const rawCursor: string | null = (row as any).cursor ?? null;
-
-      if (rawCursor) return decodeCursor(rawCursor);
-
-      // legacy fallback
-      const ms = Number(row.lastProcessedTimestamp);
-
-      if (!Number.isFinite(ms) || ms <= 0) return null;
-
-      return { t: ms, id: '' };
-    } catch (e) {
-      this.logger.warn(`Failed to load worker state: ${(e as Error).message}`);
-
-      return null;
-    }
-  }
-
-  private async saveCursor(c: ChannelCursor): Promise<void> {
-    try {
-      await this.prisma.workerState.upsert({
-        where: { id: WORKER_STATE_KEY },
-        update: { lastProcessedTimestamp: BigInt(c.t), cursor: encodeCursor(c) },
-        create: {
-          id: WORKER_STATE_KEY,
-          lastProcessedTimestamp: BigInt(c.t),
-          cursor: encodeCursor(c),
-        },
-      });
-    } catch (e) {
-      this.logger.warn(`Failed to persist worker state: ${(e as Error).message}`);
-    }
   }
 }

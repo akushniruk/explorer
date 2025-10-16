@@ -14,14 +14,15 @@ export type EnvVars = {
   YELLOW_WS_REQUEST_TIMEOUT_MS: number;
   YELLOW_WS_RECONNECT_BASE_MS: number;
   YELLOW_WS_RECONNECT_MAX_MS: number;
+  SYNC_INTERVAL_MS: number;
+  SYNC_CHANNELS_LIMIT: number;
+  SYNC_CHANNELS_BUDGET_MS: number;
+  SYNC_CHANNELS_SLEEP_MS: number;
+  SYNC_CHANNELS_REFRESH_MS: number;
   SYNC_ASSETS_REFRESH_MS: number;
   SYNC_APP_SESSIONS_PAGE_SIZE: number;
   SYNC_APP_SESSIONS_BUDGET_MS: number;
   SYNC_APP_SESSIONS_REFRESH_MS: number;
-
-  SYNC_INTERVAL_MS: number;
-  SYNC_FULL_SLEEP_MS: number;
-  SYNC_CHANNELS_LIMIT: number;
   SYNC_TXS_PAGE_SIZE: number;
   SYNC_TXS_BUDGET_MS: number;
 
@@ -46,18 +47,16 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
   YELLOW_WS_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).default(90_000),
   YELLOW_WS_RECONNECT_BASE_MS: Joi.number().integer().min(100).default(1_000),
   YELLOW_WS_RECONNECT_MAX_MS: Joi.number().integer().min(1_000).default(60_000),
-  SYNC_ASSETS_REFRESH_MS: Joi.number()
-    .integer()
-    .min(10_000)
-    .default(30 * 60 * 1000),
-
-  SYNC_APP_SESSIONS_PAGE_SIZE: Joi.number().integer().min(10).max(500).default(100),
-  SYNC_APP_SESSIONS_BUDGET_MS: Joi.number().integer().min(1000).default(10_000),
-  SYNC_APP_SESSIONS_REFRESH_MS: Joi.number().integer().min(10_000).default(300_000),
 
   SYNC_INTERVAL_MS: Joi.number().integer().min(5_000).default(90_000),
-  SYNC_FULL_SLEEP_MS: Joi.number().integer().min(0).default(3_000),
   SYNC_CHANNELS_LIMIT: Joi.number().integer().min(10).max(1000).default(100),
+  SYNC_CHANNELS_BUDGET_MS: Joi.number().integer().min(1000).default(60_000),
+  SYNC_CHANNELS_SLEEP_MS: Joi.number().integer().min(0).default(1000),
+  SYNC_CHANNELS_REFRESH_MS: Joi.number().integer().min(10_000).default(5 * 60 * 1000),
+  SYNC_ASSETS_REFRESH_MS: Joi.number().integer().min(10_000).default(30 * 60 * 1000),
+  SYNC_APP_SESSIONS_PAGE_SIZE: Joi.number().integer().min(10).max(500).default(100),
+  SYNC_APP_SESSIONS_BUDGET_MS: Joi.number().integer().min(1000).default(60_000),
+  SYNC_APP_SESSIONS_REFRESH_MS: Joi.number().integer().min(10_000).default(5 * 60 * 1000),
   SYNC_TXS_PAGE_SIZE: Joi.number().integer().min(50).max(1000).default(200),
   SYNC_TXS_BUDGET_MS: Joi.number().integer().min(1000).default(10_000),
 
