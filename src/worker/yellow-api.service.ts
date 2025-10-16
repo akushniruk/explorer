@@ -284,13 +284,30 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
       try {
         response = parseAnyRPCResponse(rawData);
       } catch (err) {
-        // Generic parser failed, use loose response
-        this.logger.debug('Response parsing failed; using loose response', {
-          component: 'YellowApiService',
-          method,
-          error: (err as Error)?.message ?? String(err),
-          requestId,
-        });
+        // Generic parser failed (likely due to schema validation like unknown enum values)
+        // Use loose response without strict validation
+        const errorMsg = (err as Error)?.message ?? String(err);
+
+        // Only log as debug for known enum validation issues, warn for others
+        if (errorMsg.includes('Invalid enum value') || errorMsg.includes('invalid_enum_value')) {
+          this.logger.debug(
+            'Response contains values outside expected enum (using loose parsing)',
+            {
+              component: 'YellowApiService',
+              method,
+              requestId,
+              note: 'This is expected when API returns new enum values before SDK update',
+            },
+          );
+        } else {
+          this.logger.warn('Response parsing failed; using loose response', {
+            component: 'YellowApiService',
+            method,
+            error: errorMsg.substring(0, 500), // Truncate long errors
+            requestId,
+          });
+        }
+
         response = this.makeLooseResponse(method, rawData, requestId);
       }
 
@@ -407,6 +424,7 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build a "loose" response for a known method without zod validation.
    * Uses a generic to satisfy the discriminated union of RPCResponse.
+   * This allows handling of responses with non-standard enum values (e.g., "joining" status).
    */
   private makeLooseResponse<M extends RPCMethod>(
     method: M,
@@ -419,8 +437,14 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
       const obj = JSON.parse(raw);
       let p = Array.isArray(obj.res) ? obj.res[2] : undefined;
 
+      // Handle GetChannels responses with non-standard enum values
+      if (method === RPCMethod.GetChannels && p && typeof p === 'object' && 'channels' in p) {
+        // Pass through channels array as-is without enum validation
+        // This allows statuses like "joining" that aren't in the SDK's enum yet
+        params = p;
+      }
       // In v0.3.0, responses should have proper structure, but handle legacy format
-      if (method === RPCMethod.GetAppSessions) {
+      else if (method === RPCMethod.GetAppSessions) {
         if (Array.isArray(p) && Array.isArray(p[0])) {
           // Legacy format: [[ {...}, ... ]]
           p = { appSessions: p[0] };
@@ -451,9 +475,12 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
           // Not an object, set empty
           p = { appSessions: [] };
         }
-      }
 
-      params = p;
+        params = p;
+      } else {
+        // Default: pass through params as-is
+        params = p;
+      }
     } catch {
       params = undefined;
     }

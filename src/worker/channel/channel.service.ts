@@ -1,12 +1,84 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetChannelsResponseParams } from '@erc7824/nitrolite';
+import { YellowApiService } from '../yellow-api.service';
 
 @Injectable()
 export class ChannelService {
   private readonly logger = new Logger(ChannelService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly yellowApi: YellowApiService,
+  ) {}
+
+  /**
+   * Ensures that required assets exist before processing channels.
+   * Fetches missing assets from the API and upserts them.
+   */
+  private async ensureAssetsExist(channels: GetChannelsResponseParams['channels']): Promise<void> {
+    // Collect unique chain_ids from channels
+    const chainIds = new Set<number>();
+
+    for (const channel of channels) {
+      const chainId = (channel as any).chain_id || channel.chainId;
+
+      if (chainId !== undefined && chainId !== null) {
+        chainIds.add(Number(chainId));
+      }
+    }
+
+    // Fetch and upsert assets for each chain_id
+    for (const chainId of chainIds) {
+      try {
+        const assetsResponse = await this.yellowApi.getAssets(chainId);
+
+        if (!assetsResponse?.params?.assets || assetsResponse.params.assets.length === 0) {
+          continue;
+        }
+
+        // Upsert assets in chunks
+        const assets = assetsResponse.params.assets;
+        const CHUNK_SIZE = 50;
+
+        for (let i = 0; i < assets.length; i += CHUNK_SIZE) {
+          const chunk = assets.slice(i, i + CHUNK_SIZE);
+
+          await this.prisma.$transaction(
+            chunk.map((asset) =>
+              this.prisma.asset.upsert({
+                where: {
+                  token_chain_id: {
+                    token: asset.token,
+                    chain_id: BigInt(asset.chainId),
+                  },
+                },
+                create: {
+                  token: asset.token,
+                  chain_id: BigInt(asset.chainId),
+                  symbol: asset.symbol?.trim().slice(0, 32) || '',
+                  decimals: BigInt(asset.decimals),
+                },
+                update: {
+                  symbol: asset.symbol?.trim().slice(0, 32) || '',
+                  decimals: BigInt(asset.decimals),
+                },
+              }),
+            ),
+          );
+        }
+
+        this.logger.debug(`Ensured assets exist for chain_id ${chainId}`, {
+          count: assets.length,
+        });
+      } catch (error) {
+        this.logger.warn(`Failed to fetch/upsert assets for chain_id ${chainId}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue processing - the channel upsert will fail if the asset is truly missing
+      }
+    }
+  }
 
   public async processChannels(channelsResponse: GetChannelsResponseParams): Promise<void> {
     if (!channelsResponse || !channelsResponse.channels || channelsResponse.channels.length === 0)
@@ -20,6 +92,9 @@ export class ChannelService {
       batchSize: channelsResponse.channels.length,
       startTime: new Date().toISOString(),
     });
+
+    // Ensure all required assets exist before processing channels
+    await this.ensureAssetsExist(channelsResponse.channels);
 
     for (const channel of channelsResponse.channels) {
       // API returns snake_case, handle both formats for compatibility
