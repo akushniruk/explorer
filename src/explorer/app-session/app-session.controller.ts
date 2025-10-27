@@ -11,7 +11,7 @@ export class AppSessionController {
   /** Single by query */
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600')
   getOneByQuery(@Query() q: GetAppSessionQueryDto) {
     return this.svc.getOne(q);
   }
@@ -19,7 +19,7 @@ export class AppSessionController {
   /** List with pagination + filters */
   @Get('list')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600')
   list(@Query() q: ListAppSessionsQueryDto) {
     return this.svc.list(q);
   }
@@ -27,7 +27,7 @@ export class AppSessionController {
   /** Total count */
   @Get('count')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600')
   count(@Query() q: Pick<ListAppSessionsQueryDto, 'status' | 'channelId' | 'participant' | 'q'>) {
     return this.svc.count(q);
   }
@@ -35,7 +35,7 @@ export class AppSessionController {
   /** Single by path (after list/count to avoid capture) */
   @Get(':id')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600')
   getOneByPath(@Param('id') id: string) {
     return this.svc.getOne({ sessionId: id });
   }

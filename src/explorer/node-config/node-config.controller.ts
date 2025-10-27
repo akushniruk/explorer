@@ -8,7 +8,7 @@ export class NodeConfigController {
 
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600')
   getConfig() {
     return this.svc.getConfig();
   }

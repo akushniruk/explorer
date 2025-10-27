@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { YellowApiService } from '../yellow-api.service';
 import { GetAssetsResponseParams } from '@erc7824/nitrolite';
+import { CacheService } from '../../common/cache';
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/i;
 const asAddress = (v: string, field: string) => {
@@ -26,6 +27,7 @@ export class AssetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly yellow: YellowApiService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -56,11 +58,14 @@ export class AssetService {
       durationMs: duration,
     });
 
+    // Invalidate asset caches after successful sync
+    await this.cacheService.invalidateAssets();
+
     return { count: params.assets.length };
   }
 
   /**
-   * Idempotent upserts in chunks. Validates addresses/decimals.
+   * Idempotent bulk upserts using raw SQL. Validates addresses/decimals.
    */
   async processAssets(assetsResponse: GetAssetsResponseParams): Promise<void> {
     // map & validate
@@ -71,20 +76,30 @@ export class AssetService {
       decimals: toBigIntSafe(a.decimals, 'decimals'),
     }));
 
-    const CHUNK = 50;
+    const CHUNK = 500; // Increased for bulk SQL
 
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
 
-      await this.prisma.$transaction(
-        slice.map((r) =>
-          this.prisma.asset.upsert({
-            where: { token_chain_id: { token: r.token, chain_id: r.chain_id } }, // @@id([token, chain_id])
-            create: r,
-            update: { symbol: r.symbol, decimals: r.decimals },
-          }),
-        ),
-      );
+      const values: string[] = [];
+      const now = new Date().toISOString();
+
+      slice.forEach((r) => {
+        const symbol = r.symbol.replace(/'/g, "''");
+        values.push(`('${r.token}', ${r.chain_id}, '${symbol}', ${r.decimals}, '${now}', '${now}')`);
+      });
+
+      const sql = `
+        INSERT INTO "assets" ("token", "chain_id", "symbol", "decimals", "created_at", "updated_at")
+        VALUES ${values.join(', ')}
+        ON CONFLICT ("token", "chain_id")
+        DO UPDATE SET
+          "symbol" = EXCLUDED."symbol",
+          "decimals" = EXCLUDED."decimals",
+          "updated_at" = EXCLUDED."updated_at"
+      `;
+
+      await this.prisma.$executeRawUnsafe(sql);
     }
   }
 }

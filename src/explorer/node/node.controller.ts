@@ -11,7 +11,7 @@ export class NodeController {
   /** Single node by query */
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=900, s-maxage=900, stale-while-revalidate=1800')
   single(@Query() q: Pick<ListNodesQueryDto, 'q'>) {
     return this.svc.single(q);
   }
@@ -20,7 +20,7 @@ export class NodeController {
   @Get('list')
   @EtagResource('nodes')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=900, s-maxage=900, stale-while-revalidate=1800')
   list(@Query() q: ListNodesQueryDto) {
     return this.svc.list(q);
   }
@@ -28,7 +28,7 @@ export class NodeController {
   /** Total count with filters */
   @Get('count')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=900, s-maxage=900, stale-while-revalidate=1800')
   count(@Query() q: Pick<ListNodesQueryDto, 'q' | 'country' | 'region' | 'status' | 'bbox'>) {
     return this.svc.count(q);
   }
@@ -36,7 +36,7 @@ export class NodeController {
   /** Active nodes count */
   @Get('count-active')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=900, s-maxage=900, stale-while-revalidate=1800')
   countActive() {
     return this.svc.countActive();
   }
@@ -44,7 +44,7 @@ export class NodeController {
   /** Get node by address */
   @Get(':address')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=900, s-maxage=900, stale-while-revalidate=1800')
   findByAddress(@Param('address') address: string) {
     return this.svc.findByAddress(address);
   }

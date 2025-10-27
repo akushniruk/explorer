@@ -11,7 +11,7 @@ export class NetworkController {
   /** Single network by query */
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200')
   getOneByQuery(@Query() q: GetNetworkQueryDto) {
     return this.svc.getOne(q);
   }
@@ -19,7 +19,7 @@ export class NetworkController {
   /** List with pagination + filters */
   @Get('list')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200')
   list(@Query() q: ListNetworksQueryDto) {
     return this.svc.list(q);
   }
@@ -27,7 +27,7 @@ export class NetworkController {
   /** Total count */
   @Get('count')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200')
   count(@Query() q: Pick<ListNetworksQueryDto, 'chainId' | 'q' | 'broker'>) {
     return this.svc.count(q);
   }
@@ -35,7 +35,7 @@ export class NetworkController {
   /** Single by path (put after list/count to avoid capture) */
   @Get(':id')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200')
   getOneByPath(@Param('id') id: string) {
     return this.svc.getOne({ chainId: id });
   }

@@ -25,7 +25,7 @@ type AnySession = RPCAppSession | RawSnake | Record<string, unknown>;
 @Injectable()
 export class AppSessionService {
   private readonly logger = new Logger(AppSessionService.name);
-  private readonly CHUNK = 50;
+  private readonly CHUNK = 500; // Increased for bulk SQL
 
   constructor(
     private readonly prisma: PrismaService,
@@ -230,58 +230,78 @@ export class AppSessionService {
       };
     });
 
+    // Check for duplicates within the batch
+    const uniqueIds = new Set(rows.map((r) => r.session_id));
+    const duplicatesInBatch = rows.length - uniqueIds.size;
+
+    if (duplicatesInBatch > 0) {
+      this.logger.warn('Found duplicate session IDs in the same batch', {
+        totalRows: rows.length,
+        uniqueIds: uniqueIds.size,
+        duplicates: duplicatesInBatch,
+      });
+    }
+
+    // Bulk upsert using raw SQL to reduce 4M queries to 8K queries (500x reduction)
     for (let i = 0; i < rows.length; i += this.CHUNK) {
       const slice = rows.slice(i, i + this.CHUNK);
 
-      await this.prisma.$transaction(
-        slice.map((r) => {
-          const createBase: any = {
-            session_id: r.session_id,
-            protocol: r.protocol,
-            participants: r.participants,
-            weight: r.weight,
-            quorum: r.quorum,
-            version: r.version,
-            nonce: r.nonce,
-            status: r.status,
-            channel_id: r.channel_id,
-            challenge: r.challenge,
-            session_data: r.session_data,
-          };
+      // NOTE: We no longer pre-check which sessions exist to avoid SELECT egress.
+      // Postgres ON CONFLICT handles insert vs update efficiently with proper indexes.
 
-          // Preserve original timestamps from API
-          if (this.isValidDate(r.created_at)) {
-            createBase.created_at = r.created_at;
-          }
+      const values: string[] = [];
 
-          if (this.isValidDate(r.updated_at)) {
-            createBase.updated_at = r.updated_at;
-          }
+      slice.forEach((r) => {
+        const createdAt = this.isValidDate(r.created_at)
+          ? r.created_at.toISOString()
+          : new Date().toISOString();
+        const updatedAt = this.isValidDate(r.updated_at)
+          ? r.updated_at.toISOString()
+          : new Date().toISOString();
 
-          const updateBase: any = {
-            protocol: r.protocol,
-            participants: r.participants,
-            weight: r.weight,
-            quorum: r.quorum,
-            version: r.version,
-            nonce: r.nonce,
-            status: r.status,
-            challenge: r.challenge,
-            session_data: r.session_data,
-          };
+        // Escape single quotes and prepare array literals
+        const participants = `{${r.participants.map((p) => `"${p.replace(/"/g, '\\"')}"`).join(',')}}`;
+        const sessionData = r.session_data
+          ? `'${String(r.session_data).replace(/'/g, "''")}'`
+          : 'NULL';
 
-          // Preserve updated_at from API in updates too
-          if (this.isValidDate(r.updated_at)) {
-            updateBase.updated_at = r.updated_at;
-          }
+        values.push(
+          `('${r.protocol}', '${r.session_id}', '${r.channel_id}', ${r.nonce}, '${participants}'::text[], '{${r.weight.join(',')}}'::integer[], ${r.quorum}, ${r.version}, '${r.status}', ${r.challenge}, ${sessionData}, '${createdAt}', '${updatedAt}')`,
+        );
+      });
 
-          return this.prisma.appSession.upsert({
-            where: { session_id: r.session_id },
-            create: createBase,
-            update: updateBase,
-          });
-        }),
-      );
+      const sql = `
+        INSERT INTO "app_sessions" (
+          "protocol", "session_id", "channel_id", "nonce", "participants",
+          "weight", "quorum", "version", "status", "challenge",
+          "session_data", "created_at", "updated_at"
+        )
+        VALUES ${values.join(', ')}
+        ON CONFLICT ("session_id")
+        DO UPDATE SET
+          "protocol" = EXCLUDED."protocol",
+          "participants" = EXCLUDED."participants",
+          "weight" = EXCLUDED."weight",
+          "quorum" = EXCLUDED."quorum",
+          "version" = EXCLUDED."version",
+          "nonce" = EXCLUDED."nonce",
+          "status" = EXCLUDED."status",
+          "challenge" = EXCLUDED."challenge",
+          "session_data" = EXCLUDED."session_data",
+          "updated_at" = EXCLUDED."updated_at"
+      `;
+
+      await this.prisma.$executeRawUnsafe(sql);
+
+      this.logger.debug('Processed app sessions chunk', {
+        chunkIndex: Math.floor(i / this.CHUNK) + 1,
+        chunkSize: slice.length,
+      });
     }
+
+    this.logger.log('App sessions batch processed', {
+      totalProcessed: rows.length,
+      duplicatesInBatch,
+    });
   }
 }

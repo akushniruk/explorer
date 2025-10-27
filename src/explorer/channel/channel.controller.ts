@@ -13,7 +13,7 @@ export class ChannelController {
   @Get()
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300')
   getOneByQuery(@Query() q: GetChannelQueryDto) {
     return this.svc.getOne(q);
   }
@@ -22,7 +22,7 @@ export class ChannelController {
   @Get('list')
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300')
   list(@Query() q: ListChannelsQueryDto) {
     return this.svc.list(q);
   }
@@ -31,7 +31,7 @@ export class ChannelController {
   @Get('count')
   @EtagResource('channels')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300')
   count(@Query() q: Pick<ListChannelsQueryDto, 'status' | 'token' | 'chainId'>) {
     return this.svc.count(q);
   }
@@ -40,7 +40,7 @@ export class ChannelController {
   @Get('wallet/:address')
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=180, s-maxage=180, stale-while-revalidate=300')
   getByWallet(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
     return this.svc.getByWallet(address, q);
   }
@@ -49,7 +49,7 @@ export class ChannelController {
   @Get('participant/:address')
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=180, s-maxage=180, stale-while-revalidate=300')
   getByParticipant(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
     return this.svc.getByParticipant(address, q);
   }
@@ -58,7 +58,7 @@ export class ChannelController {
   @Get('address/:address')
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=180, s-maxage=180, stale-while-revalidate=300')
   getByAddress(@Param('address') address: string, @Query() q: ListChannelsQueryDto) {
     return this.svc.getByAddress(address, q);
   }
@@ -67,7 +67,7 @@ export class ChannelController {
   @Get('/:id')
   @EtagResource('channels')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=5')
+  @Header('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300')
   getOneByPath(@Param('id') id: string) {
     return this.svc.getOne({ channelId: id });
   }

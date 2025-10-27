@@ -1,14 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetChannelQueryDto } from './dto/get-channel.dto';
 import { ListChannelsQueryDto } from './dto/list-channels.dto';
+import { CacheKeys, CACHE_TTL } from '../../config/cache.config';
 
 @Injectable()
 export class ChannelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   async getOne(q: GetChannelQueryDto) {
+    const cacheKey = CacheKeys.channelDetail(q.channelId);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const item = await this.prisma.channel.findUnique({
       where: { channel_id: q.channelId },
       include: {
@@ -24,7 +39,7 @@ export class ChannelService {
     if (!item) throw new NotFoundException(`Channel ${q.channelId} not found`);
 
     // Transform BigInts to strings for JSON serialization
-    return {
+    const result = {
       ...item,
       chain_id: item.chain_id.toString(),
       amount: item.amount.toString(),
@@ -38,9 +53,23 @@ export class ChannelService {
           }
         : null,
     };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.CHANNEL_DETAIL);
+
+    return result;
   }
 
   async list(q: ListChannelsQueryDto) {
+    const cacheKey = CacheKeys.channelList(q);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.ChannelWhereInput = {
       ...(q.status ? { status: q.status } : {}),
       ...(q.token ? { token: q.token } : {}),
@@ -99,7 +128,7 @@ export class ChannelService {
         : null,
     }));
 
-    return {
+    const result = {
       items: serializedItems,
       page: q.page,
       limit: q.limit,
@@ -107,9 +136,23 @@ export class ChannelService {
       totalPages,
       hasMore: q.page < totalPages,
     };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.CHANNELS);
+
+    return result;
   }
 
   async count(filters: Pick<ListChannelsQueryDto, 'status' | 'token' | 'chainId'>) {
+    const cacheKey = CacheKeys.channelCount(filters);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.ChannelWhereInput = {
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.token ? { token: filters.token } : {}),
@@ -117,10 +160,24 @@ export class ChannelService {
     };
     const total = await this.prisma.channel.count({ where });
 
-    return { total };
+    const result = { total };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.COUNTS);
+
+    return result;
   }
 
   async getByWallet(wallet: string, query: ListChannelsQueryDto) {
+    const cacheKey = CacheKeys.channelByWallet(wallet, query);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.ChannelWhereInput = {
       wallet,
       ...(query.status ? { status: query.status } : {}),
@@ -175,7 +232,7 @@ export class ChannelService {
         : null,
     }));
 
-    return {
+    const result = {
       items: serializedItems,
       participants: participantData.map((p) => p.participant),
       page: query.page,
@@ -184,9 +241,23 @@ export class ChannelService {
       totalPages,
       hasMore: query.page < totalPages,
     };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.CHANNEL_BY_ADDRESS);
+
+    return result;
   }
 
   async getByParticipant(participant: string, query: ListChannelsQueryDto) {
+    const cacheKey = CacheKeys.channelByParticipant(participant, query);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.ChannelWhereInput = {
       participant,
       ...(query.status ? { status: query.status } : {}),
@@ -239,7 +310,7 @@ export class ChannelService {
         : null,
     }));
 
-    return {
+    const result = {
       items: serializedItems,
       wallet: walletData?.wallet,
       page: query.page,
@@ -248,9 +319,22 @@ export class ChannelService {
       totalPages,
       hasMore: query.page < totalPages,
     };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.CHANNEL_BY_ADDRESS);
+
+    return result;
   }
 
   async getByAddress(address: string, query: ListChannelsQueryDto) {
+    const cacheKey = CacheKeys.channelByAddress(address, query);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     console.log(`[getByAddress] Called with address: ${address}`);
 
     // Optimized: Check both wallet and participant counts in a single transaction
@@ -263,23 +347,26 @@ export class ChannelService {
       `[getByAddress] Wallet count: ${walletCount}, Participant count: ${participantCount}`,
     );
 
+    let result;
+
     // If found as wallet (prioritize wallet over participant)
     if (walletCount > 0) {
       const asWallet = await this.getByWallet(address, query);
-      const result = { ...asWallet, lookupType: 'wallet' as const };
+      result = { ...asWallet, lookupType: 'wallet' as const };
 
       console.log(
         `[getByAddress] Returning wallet result with ${result.participants.length} participants`,
       );
+    } else {
+      // Otherwise return as participant (may have 0 items if address doesn't exist)
+      const asParticipant = await this.getByParticipant(address, query);
+      result = { ...asParticipant, lookupType: 'participant' as const };
 
-      return result;
+      console.log(`[getByAddress] Returning participant result`);
     }
 
-    // Otherwise return as participant (may have 0 items if address doesn't exist)
-    const asParticipant = await this.getByParticipant(address, query);
-    const result = { ...asParticipant, lookupType: 'participant' as const };
-
-    console.log(`[getByAddress] Returning participant result`);
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.CHANNEL_BY_ADDRESS);
 
     return result;
   }

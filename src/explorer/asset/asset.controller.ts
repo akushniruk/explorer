@@ -11,7 +11,7 @@ export class AssetController {
   /** Single asset by composite key (token + chainId) */
   @Get()
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200')
   getOne(@Query() q: GetAssetQueryDto) {
     return this.svc.getOne(q);
   }
@@ -19,7 +19,7 @@ export class AssetController {
   /** List with pagination + filters */
   @Get('list')
   @Throttle({ default: { limit: 60, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=15')
+  @Header('Cache-Control', 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600')
   list(@Query() q: ListAssetsQueryDto) {
     return this.svc.list(q);
   }
@@ -27,7 +27,7 @@ export class AssetController {
   /** Total count (filtered subset) */
   @Get('count')
   @Throttle({ default: { limit: 120, ttl: 60 } })
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600')
   count(@Query() q: Pick<ListAssetsQueryDto, 'token' | 'chainId' | 'q'>) {
     return this.svc.count(q);
   }

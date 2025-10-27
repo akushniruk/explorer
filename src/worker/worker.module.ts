@@ -7,15 +7,19 @@ import { AssetService } from './asset/asset.service';
 import { NodeConfigService } from './node-config/node-config.service';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CacheModule } from '@nestjs/cache-manager';
 import workerConfig from './worker.config';
 import { envValidationSchema } from '../config/env.validation';
 import { HealthService } from './health/health.service';
 import { AppSessionService } from './app-session/app-session.service';
+import { CacheService } from '../common/cache';
+import { cacheConfig } from '../config/cache.config';
 
 @Module({
   imports: [
     PrismaModule,
     ScheduleModule.forRoot(),
+    CacheModule.register(cacheConfig),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [workerConfig],
@@ -36,6 +40,7 @@ import { AppSessionService } from './app-session/app-session.service';
     HealthService,
     NodeConfigService,
     AppSessionService,
+    CacheService,
   ],
 })
 export class WorkerModule {}

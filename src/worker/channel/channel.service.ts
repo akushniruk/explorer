@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetChannelsResponseParams } from '@erc7824/nitrolite';
 import { YellowApiService } from '../yellow-api.service';
+import { CacheService } from '../../common/cache';
 
 @Injectable()
 export class ChannelService {
@@ -10,6 +11,7 @@ export class ChannelService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly yellowApi: YellowApiService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -37,40 +39,42 @@ export class ChannelService {
           continue;
         }
 
-        // Upsert assets in chunks
+        // Bulk upsert assets using raw SQL
         const assets = assetsResponse.params.assets;
-        const CHUNK_SIZE = 50;
+        const CHUNK_SIZE = 500;
 
         for (let i = 0; i < assets.length; i += CHUNK_SIZE) {
           const chunk = assets.slice(i, i + CHUNK_SIZE);
 
-          await this.prisma.$transaction(
-            chunk.map((asset) =>
-              this.prisma.asset.upsert({
-                where: {
-                  token_chain_id: {
-                    token: asset.token,
-                    chain_id: BigInt(asset.chainId),
-                  },
-                },
-                create: {
-                  token: asset.token,
-                  chain_id: BigInt(asset.chainId),
-                  symbol: asset.symbol?.trim().slice(0, 32) || '',
-                  decimals: BigInt(asset.decimals),
-                },
-                update: {
-                  symbol: asset.symbol?.trim().slice(0, 32) || '',
-                  decimals: BigInt(asset.decimals),
-                },
-              }),
-            ),
-          );
+          const values: string[] = [];
+          const now = new Date().toISOString();
+
+          chunk.forEach((asset) => {
+            const symbol = (asset.symbol?.trim().slice(0, 32) || '').replace(/'/g, "''");
+            values.push(
+              `('${asset.token}', ${asset.chainId}, '${symbol}', ${asset.decimals}, '${now}', '${now}')`,
+            );
+          });
+
+          const sql = `
+            INSERT INTO "assets" ("token", "chain_id", "symbol", "decimals", "created_at", "updated_at")
+            VALUES ${values.join(', ')}
+            ON CONFLICT ("token", "chain_id")
+            DO UPDATE SET
+              "symbol" = EXCLUDED."symbol",
+              "decimals" = EXCLUDED."decimals",
+              "updated_at" = EXCLUDED."updated_at"
+          `;
+
+          await this.prisma.$executeRawUnsafe(sql);
         }
 
         this.logger.debug(`Ensured assets exist for chain_id ${chainId}`, {
           count: assets.length,
         });
+
+        // Invalidate asset caches after updating
+        await this.cacheService.invalidateAssets();
       } catch (error) {
         this.logger.warn(`Failed to fetch/upsert assets for chain_id ${chainId}`, {
           error: error instanceof Error ? error.message : String(error),
@@ -139,34 +143,68 @@ export class ChannelService {
       channelsToUpsert.push({ dataToUpsert, updatedAt });
     }
 
-    // Batch upsert channels in chunks to reduce database round-trips
-    const CHUNK_SIZE = 50;
+    // Check for duplicates within the batch
+    const uniqueChannelIds = new Set(channelsToUpsert.map((c) => c.dataToUpsert.channel_id));
+    const duplicatesInBatch = channelsToUpsert.length - uniqueChannelIds.size;
+
+    if (duplicatesInBatch > 0) {
+      this.logger.warn('Found duplicate channel IDs in the same batch', {
+        totalRows: channelsToUpsert.length,
+        uniqueIds: uniqueChannelIds.size,
+        duplicates: duplicatesInBatch,
+      });
+    }
+
+    // Bulk upsert channels using raw SQL to reduce database queries from N to 1 per chunk
+    const CHUNK_SIZE = 500; // Increased chunk size since we're using bulk SQL
 
     for (let i = 0; i < channelsToUpsert.length; i += CHUNK_SIZE) {
       const chunk = channelsToUpsert.slice(i, i + CHUNK_SIZE);
 
-      await this.prisma.$transaction(
-        chunk.map(({ dataToUpsert, updatedAt }) =>
-          this.prisma.channel.upsert({
-            where: { channel_id: dataToUpsert.channel_id },
-            create: dataToUpsert,
-            update: {
-              participant: dataToUpsert.participant,
-              status: dataToUpsert.status,
-              token: dataToUpsert.token,
-              wallet: dataToUpsert.wallet,
-              amount: dataToUpsert.amount,
-              chain_id: dataToUpsert.chain_id,
-              adjudicator: dataToUpsert.adjudicator,
-              challenge: dataToUpsert.challenge,
-              nonce: dataToUpsert.nonce,
-              version: dataToUpsert.version,
-              // Preserve updated_at from API, let Prisma handle if not provided
-              ...(updatedAt && { updated_at: updatedAt }),
-            },
-          }),
-        ),
-      );
+      // NOTE: We no longer pre-check which channels exist to avoid SELECT egress.
+      // Postgres ON CONFLICT handles insert vs update efficiently with proper indexes.
+
+      // Build VALUES clause for bulk insert
+      const values: string[] = [];
+
+      chunk.forEach(({ dataToUpsert }) => {
+        const createdAt = dataToUpsert.created_at || new Date();
+        const updatedAt = dataToUpsert.updated_at || new Date();
+
+        values.push(
+          `('${dataToUpsert.channel_id}', ${dataToUpsert.chain_id}, '${dataToUpsert.token}', '${dataToUpsert.wallet}', '${dataToUpsert.participant}', ${dataToUpsert.amount}, '${dataToUpsert.status}', ${dataToUpsert.challenge}, ${dataToUpsert.nonce}, ${dataToUpsert.version}, '${dataToUpsert.adjudicator}', '${createdAt.toISOString()}', '${updatedAt.toISOString()}')`,
+        );
+      });
+
+      // Single bulk UPSERT query - reduces 500 queries to 1
+      const sql = `
+        INSERT INTO "channels" (
+          "channel_id", "chain_id", "token", "wallet", "participant",
+          "amount", "status", "challenge", "nonce", "version",
+          "adjudicator", "created_at", "updated_at"
+        )
+        VALUES ${values.join(', ')}
+        ON CONFLICT ("channel_id")
+        DO UPDATE SET
+          "participant" = EXCLUDED."participant",
+          "status" = EXCLUDED."status",
+          "token" = EXCLUDED."token",
+          "wallet" = EXCLUDED."wallet",
+          "amount" = EXCLUDED."amount",
+          "chain_id" = EXCLUDED."chain_id",
+          "adjudicator" = EXCLUDED."adjudicator",
+          "challenge" = EXCLUDED."challenge",
+          "nonce" = EXCLUDED."nonce",
+          "version" = EXCLUDED."version",
+          "updated_at" = EXCLUDED."updated_at"
+      `;
+
+      await this.prisma.$executeRawUnsafe(sql);
+
+      this.logger.debug('Processed channels chunk', {
+        chunkIndex: Math.floor(i / CHUNK_SIZE) + 1,
+        chunkSize: chunk.length,
+      });
     }
 
     const duration = Date.now() - startTime;
@@ -174,9 +212,13 @@ export class ChannelService {
     this.logger.log('Channel batch processing completed', {
       component: 'ChannelService',
       operation: 'process_channels',
-      batchSize: channelsResponse.channels.length,
+      totalProcessed: channelsResponse.channels.length,
+      duplicatesInBatch,
       duration: `${duration}ms`,
       averagePerChannel: `${Math.round(duration / channelsResponse.channels.length)}ms`,
     });
+
+    // Invalidate channel caches after successful processing
+    await this.cacheService.invalidateChannels();
   }
 }

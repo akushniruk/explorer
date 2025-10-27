@@ -1,7 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Prisma, Node as DbNode } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListNodesQueryDto } from './dto/list-nodes.dto';
+import { CacheKeys, CACHE_TTL } from '../../config/cache.config';
 
 type NodeView = {
   slug: string;
@@ -55,13 +58,25 @@ function parseBbox(bbox?: string) {
 
 @Injectable()
 export class NodeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   async single(q: Pick<ListNodesQueryDto, 'q'>) {
     if (!q.q) {
       throw new Error('Query parameter "q" is required');
     }
 
+    const cacheKey = CacheKeys.nodeDetail(q.q);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const node = await this.prisma.node.findFirst({
       where: {
         OR: [{ slug: q.q }, { name: { contains: q.q, mode: 'insensitive' } }],
@@ -90,10 +105,24 @@ export class NodeService {
       throw new Error('Node not found');
     }
 
-    return serialize(node);
+    const result = serialize(node);
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.NODE_DETAIL);
+
+    return result;
   }
 
   async list(q: ListNodesQueryDto) {
+    const cacheKey = CacheKeys.nodeList(q);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.NodeWhereInput = {
       ...(q.q ? { name: { contains: q.q, mode: 'insensitive' } } : {}),
       ...(q.country ? { country_code: q.country.toUpperCase() } : {}),
@@ -151,7 +180,7 @@ export class NodeService {
 
     const totalPages = Math.ceil(total / q.limit);
 
-    return {
+    const result = {
       items: items.map(serialize),
       page: q.page,
       limit: q.limit,
@@ -159,9 +188,23 @@ export class NodeService {
       totalPages,
       hasMore: q.page < totalPages,
     };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.NODES);
+
+    return result;
   }
 
   async count(filters: Pick<ListNodesQueryDto, 'q' | 'country' | 'region' | 'status' | 'bbox'>) {
+    const cacheKey = CacheKeys.nodeCount(filters);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.NodeWhereInput = {
       ...(filters.q ? { name: { contains: filters.q, mode: 'insensitive' } } : {}),
       ...(filters.country ? { country_code: filters.country.toUpperCase() } : {}),
@@ -185,17 +228,36 @@ export class NodeService {
 
     const total = await this.prisma.node.count({ where });
 
-    return { total };
+    const result = { total };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.COUNTS);
+
+    return result;
   }
 
   async countActive() {
+    const cacheKey = CacheKeys.nodeCountActive();
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const total = await this.prisma.node.count({
       where: {
         OR: [{ status: 'active' }, { available: true }],
       },
     });
 
-    return { total };
+    const result = { total };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.COUNTS);
+
+    return result;
   }
 
   async findByAddress(address: string) {
@@ -203,6 +265,15 @@ export class NodeService {
       throw new Error('Address parameter is required');
     }
 
+    const cacheKey = CacheKeys.nodeDetail(address);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const node = await this.prisma.node.findFirst({
       where: {
         address: {
@@ -234,6 +305,11 @@ export class NodeService {
       throw new Error('Node not found');
     }
 
-    return serialize(node);
+    const result = serialize(node);
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.NODE_DETAIL);
+
+    return result;
   }
 }

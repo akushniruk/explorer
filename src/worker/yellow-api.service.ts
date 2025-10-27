@@ -36,6 +36,8 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   private ws!: WebSocket;
   private reconnectAttempts = 0;
   private pendingRequests = new Map<number, PendingEntry>();
+  private heartbeatInterval?: NodeJS.Timeout;
+  private readonly HEARTBEAT_INTERVAL_MS = 30_000; // Send ping every 30 seconds
 
   constructor(@Inject(workerCfg.KEY) private readonly cfg: ConfigType<typeof workerCfg>) {}
 
@@ -47,6 +49,7 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() {
     try {
+      this.stopHeartbeat();
       this.rejectAllPending(new Error('WS_SHUTTING_DOWN'));
 
       if (this.ws) {
@@ -217,6 +220,7 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
         url: this.cfg.wsUrl,
         status: 'connected',
       });
+      this.startHeartbeat();
     });
 
     this.ws.on('message', (data: WebSocket.Data) => this.handleMessage(String(data)));
@@ -233,6 +237,8 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
   }
 
   private handleDisconnection(): void {
+    this.stopHeartbeat();
+
     const base = Number(this.cfg.wsReconnectBaseMs ?? 1_000);
     const max = Number(this.cfg.wsReconnectMaxMs ?? 60_000);
 
@@ -502,6 +508,54 @@ export class YellowApiService implements OnModuleInit, OnModuleDestroy {
       } finally {
         this.pendingRequests.delete(id);
       }
+    }
+  }
+
+  /**
+   * Start sending periodic ping messages to keep the WebSocket connection alive.
+   * This prevents idle timeout disconnections from the server.
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // Clear any existing interval
+
+    this.heartbeatInterval = setInterval(() => {
+      void this.sendHeartbeatPing();
+    }, this.HEARTBEAT_INTERVAL_MS);
+
+    this.logger.debug('Heartbeat started', {
+      component: 'YellowApiService',
+      intervalMs: this.HEARTBEAT_INTERVAL_MS,
+    });
+  }
+
+  private async sendHeartbeatPing(): Promise<void> {
+    if (this.isOpen()) {
+      try {
+        await this.ping();
+        this.logger.debug('Heartbeat ping sent successfully', {
+          component: 'YellowApiService',
+          operation: 'heartbeat',
+        });
+      } catch (error) {
+        this.logger.warn('Heartbeat ping failed', {
+          component: 'YellowApiService',
+          operation: 'heartbeat',
+          error: (error as Error)?.message ?? String(error),
+        });
+      }
+    }
+  }
+
+  /**
+   * Stop the heartbeat interval.
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+      this.logger.debug('Heartbeat stopped', {
+        component: 'YellowApiService',
+      });
     }
   }
 }

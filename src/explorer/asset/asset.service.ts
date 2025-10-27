@@ -1,14 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { GetAssetQueryDto } from './dto/get-asset.dto';
 import { ListAssetsQueryDto } from './dto/list-assets.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CacheKeys, CACHE_TTL } from '../../config/cache.config';
 
 @Injectable()
 export class AssetService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   async getOne(q: GetAssetQueryDto) {
+    const cacheKey = CacheKeys.assetDetail(q.chainId, q.token);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const chain = BigInt(q.chainId);
     const item = await this.prisma.asset.findFirst({
       where: { token: q.token, chain_id: chain },
@@ -16,14 +31,28 @@ export class AssetService {
 
     if (!item) throw new NotFoundException(`Asset ${q.token}@${q.chainId} not found`);
 
-    return {
+    const result = {
       ...item,
       chain_id: item.chain_id.toString(),
       decimals: item.decimals.toString(),
     };
+
+    // Store in cache (assets are very static)
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.ASSET_DETAIL);
+
+    return result;
   }
 
   async list(q: ListAssetsQueryDto) {
+    const cacheKey = CacheKeys.assetList(q);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.AssetWhereInput = {
       ...(q.token ? { token: q.token } : {}),
       ...(q.chainId ? { chain_id: BigInt(q.chainId) } : {}),
@@ -49,7 +78,7 @@ export class AssetService {
       decimals: a.decimals.toString(),
     }));
 
-    return {
+    const result = {
       items: serialized,
       page: q.page,
       limit: q.limit,
@@ -57,9 +86,23 @@ export class AssetService {
       totalPages,
       hasMore: q.page < totalPages,
     };
+
+    // Store in cache (assets change infrequently)
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.ASSETS);
+
+    return result;
   }
 
   async count(filters: Pick<ListAssetsQueryDto, 'token' | 'chainId' | 'q'>) {
+    const cacheKey = CacheKeys.assetCount(filters);
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const where: Prisma.AssetWhereInput = {
       ...(filters.token ? { token: filters.token } : {}),
       ...(filters.chainId ? { chain_id: BigInt(filters.chainId) } : {}),
@@ -67,6 +110,11 @@ export class AssetService {
     };
     const total = await this.prisma.asset.count({ where });
 
-    return { total };
+    const result = { total };
+
+    // Store in cache
+    await this.cacheManager.set(cacheKey, result, CACHE_TTL.COUNTS);
+
+    return result;
   }
 }
