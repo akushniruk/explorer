@@ -96,6 +96,9 @@ export class ChannelService {
     // Ensure all required assets exist before processing channels
     await this.ensureAssetsExist(channelsResponse.channels);
 
+    // Prepare all channel data first
+    const channelsToUpsert: Array<{ dataToUpsert: any; updatedAt: Date | undefined }> = [];
+
     for (const channel of channelsResponse.channels) {
       // API returns snake_case, handle both formats for compatibility
       const channelId = (channel as any).channel_id || channel.channelId;
@@ -133,24 +136,37 @@ export class ChannelService {
         ...(updatedAt && { updated_at: updatedAt }),
       };
 
-      await this.prisma.channel.upsert({
-        where: { channel_id: dataToUpsert.channel_id },
-        create: dataToUpsert,
-        update: {
-          participant: dataToUpsert.participant,
-          status: dataToUpsert.status,
-          token: dataToUpsert.token,
-          wallet: dataToUpsert.wallet,
-          amount: dataToUpsert.amount,
-          chain_id: dataToUpsert.chain_id,
-          adjudicator: dataToUpsert.adjudicator,
-          challenge: dataToUpsert.challenge,
-          nonce: dataToUpsert.nonce,
-          version: dataToUpsert.version,
-          // Preserve updated_at from API, let Prisma handle if not provided
-          ...(updatedAt && { updated_at: updatedAt }),
-        },
-      });
+      channelsToUpsert.push({ dataToUpsert, updatedAt });
+    }
+
+    // Batch upsert channels in chunks to reduce database round-trips
+    const CHUNK_SIZE = 50;
+
+    for (let i = 0; i < channelsToUpsert.length; i += CHUNK_SIZE) {
+      const chunk = channelsToUpsert.slice(i, i + CHUNK_SIZE);
+
+      await this.prisma.$transaction(
+        chunk.map(({ dataToUpsert, updatedAt }) =>
+          this.prisma.channel.upsert({
+            where: { channel_id: dataToUpsert.channel_id },
+            create: dataToUpsert,
+            update: {
+              participant: dataToUpsert.participant,
+              status: dataToUpsert.status,
+              token: dataToUpsert.token,
+              wallet: dataToUpsert.wallet,
+              amount: dataToUpsert.amount,
+              chain_id: dataToUpsert.chain_id,
+              adjudicator: dataToUpsert.adjudicator,
+              challenge: dataToUpsert.challenge,
+              nonce: dataToUpsert.nonce,
+              version: dataToUpsert.version,
+              // Preserve updated_at from API, let Prisma handle if not provided
+              ...(updatedAt && { updated_at: updatedAt }),
+            },
+          }),
+        ),
+      );
     }
 
     const duration = Date.now() - startTime;

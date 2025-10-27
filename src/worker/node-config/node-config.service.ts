@@ -119,7 +119,10 @@ export class NodeConfigService {
     let networks: GetConfigResponseParams['networks'] = [];
 
     try {
-      const nets = await this.prisma.network.findMany({ orderBy: { chain_id: 'asc' } });
+      const nets = await this.prisma.network.findMany({
+        orderBy: { chain_id: 'asc' },
+        take: 100, // Reasonable limit for blockchain networks
+      });
 
       networks = nets.map((n: any) => ({
         chainId: toNum(n.chain_id as bigint, 'chainId'),

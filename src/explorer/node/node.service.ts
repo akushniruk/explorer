@@ -22,7 +22,7 @@ type NodeView = {
   updated_at: Date;
 };
 
-function serialize(node: DbNode): NodeView {
+function serialize(node: Omit<DbNode, 'id' | 'featured' | 'created_at'>): NodeView {
   return {
     slug: node.slug,
     name: node.name,
@@ -65,6 +65,24 @@ export class NodeService {
     const node = await this.prisma.node.findFirst({
       where: {
         OR: [{ slug: q.q }, { name: { contains: q.q, mode: 'insensitive' } }],
+      },
+      select: {
+        slug: true,
+        name: true,
+        ws_url: true,
+        address: true,
+        website_host: true,
+        icon_key: true,
+        description: true,
+        country_code: true,
+        region: true,
+        latitude: true,
+        longitude: true,
+        status: true,
+        available: true,
+        latency_ms: true,
+        last_seen_at: true,
+        updated_at: true,
       },
     });
 
@@ -109,8 +127,24 @@ export class NodeService {
         orderBy,
         skip,
         take: q.limit,
-        // select minimal fields (optional; or return full row)
-        // select: { slug: true, name: true, ... },
+        select: {
+          slug: true,
+          name: true,
+          ws_url: true,
+          address: true,
+          website_host: true,
+          icon_key: true,
+          description: true,
+          country_code: true,
+          region: true,
+          latitude: true,
+          longitude: true,
+          status: true,
+          available: true,
+          latency_ms: true,
+          last_seen_at: true,
+          updated_at: true,
+        },
       }),
       this.prisma.node.count({ where }),
     ]);
@@ -175,6 +209,24 @@ export class NodeService {
           equals: address,
           mode: 'insensitive',
         },
+      },
+      select: {
+        slug: true,
+        name: true,
+        ws_url: true,
+        address: true,
+        website_host: true,
+        icon_key: true,
+        description: true,
+        country_code: true,
+        region: true,
+        latitude: true,
+        longitude: true,
+        status: true,
+        available: true,
+        latency_ms: true,
+        last_seen_at: true,
+        updated_at: true,
       },
     });
 

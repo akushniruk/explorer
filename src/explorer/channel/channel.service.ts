@@ -153,6 +153,7 @@ export class ChannelService {
         where: { wallet },
         select: { participant: true },
         distinct: ['participant'],
+        take: 500, // Limit distinct participants (reasonable for ~350 total channels)
       }),
     ]);
 
@@ -252,12 +253,19 @@ export class ChannelService {
   async getByAddress(address: string, query: ListChannelsQueryDto) {
     console.log(`[getByAddress] Called with address: ${address}`);
 
-    // First try as wallet
-    const asWallet = await this.getByWallet(address, query);
+    // Optimized: Check both wallet and participant counts in a single transaction
+    const [walletCount, participantCount] = await this.prisma.$transaction([
+      this.prisma.channel.count({ where: { wallet: address } }),
+      this.prisma.channel.count({ where: { participant: address } }),
+    ]);
 
-    console.log(`[getByAddress] Wallet result: ${asWallet.items.length} items`);
+    console.log(
+      `[getByAddress] Wallet count: ${walletCount}, Participant count: ${participantCount}`,
+    );
 
-    if (asWallet.items.length > 0) {
+    // If found as wallet (prioritize wallet over participant)
+    if (walletCount > 0) {
+      const asWallet = await this.getByWallet(address, query);
       const result = { ...asWallet, lookupType: 'wallet' as const };
 
       console.log(
@@ -267,7 +275,7 @@ export class ChannelService {
       return result;
     }
 
-    // Then try as participant
+    // Otherwise return as participant (may have 0 items if address doesn't exist)
     const asParticipant = await this.getByParticipant(address, query);
     const result = { ...asParticipant, lookupType: 'participant' as const };
 
