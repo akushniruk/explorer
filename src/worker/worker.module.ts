@@ -22,6 +22,7 @@ import { cacheConfig } from '../config/cache.config';
     CacheModule.register(cacheConfig),
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: process.env.ENV_FILE ?? '.env',
       load: [workerConfig],
       validationSchema: envValidationSchema,
       validationOptions: {

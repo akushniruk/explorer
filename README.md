@@ -64,26 +64,32 @@ cd nexus
 # Install dependencies
 pnpm install
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# Create local env (safe: does not touch your Supabase .env)
+make env-local
 
-# Set up database
-npx prisma migrate deploy
-npx prisma generate
+# Start local Postgres in Docker + run Prisma setup
+make bootstrap
 
 # Optional: Seed database
-npm run prisma:seed
+make seed
 ```
+
+Local Postgres runs on `localhost:5432` and is ready for DataGrip:
+
+- Host: `localhost`
+- Port: `5432`
+- Database: `nexus`
+- User: `nexus`
+- Password: `password`
 
 ### Development
 
 ```bash
 # Start API server in development mode
-npm run start:dev
+make dev-api
 
 # Start worker in development mode (separate terminal)
-npm run start:worker:dev
+make dev-worker
 
 # Run tests
 npm test
@@ -156,17 +162,14 @@ Key configuration options:
 DATABASE_URL=postgresql://user:password@localhost:5432/nexus
 DIRECT_URL=postgresql://user:password@localhost:5432/nexus
 
-# Server
-PORT=3000
-
 # External APIs
-YELLOW_BASE_URL=wss://api.yellow.org
-REQUEST_TIMEOUT_MS=8000
+YELLOW_API_URL=wss://clearnet-sandbox.yellow.com/ws
+YELLOW_WS_REQUEST_TIMEOUT_MS=90000
 
 # Worker Configuration
-SYNC_CHANNELS_INTERVAL_MINUTES=5
-SYNC_ASSETS_INTERVAL_MINUTES=60
-SYNC_NETWORKS_INTERVAL_MINUTES=30
+SYNC_CHANNELS_REFRESH_MS=1800000
+SYNC_ASSETS_REFRESH_MS=7200000
+SYNC_APP_SESSIONS_REFRESH_MS=1800000
 ```
 
 For complete configuration schema, see `src/config/env.validation.ts`.
@@ -215,16 +218,19 @@ nexus/
 
 ```bash
 # Create new migration
-npx prisma migrate dev --name migration_name
+make prisma-migrate-dev
 
 # Generate Prisma client
-npx prisma generate
+make prisma-generate
 
-# Deploy migrations to production
-npx prisma migrate deploy
+# Apply migrations to local DB
+make prisma-migrate
 
 # Seed database
-npm run prisma:seed
+make seed
+
+# Open local psql shell
+make db-psql
 ```
 
 ### Testing
