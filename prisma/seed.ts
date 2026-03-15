@@ -8,9 +8,21 @@ type NodeSeed = {
   slug: string;
   name: string;
   wsUrl: string;
+  protocolFamily?: string;
+  protocolVersion?: string;
+  syncEnabled?: boolean;
+  isPrimary?: boolean;
+  nodeRuntimeVersion?: string;
+  supportedSigValidatorsBase64?: string;
+  lastConfigAt?: string;
+  lastConfigRawPayload?: unknown;
   websiteHost?: string;
   iconKey?: string;
   description?: string;
+  address?: string;
+  featured?: boolean;
+  status?: string;
+  available?: boolean;
   country: string; // ISO-3166 alpha-2
   region: string; // must match Prisma enum values
   lat: number;
@@ -36,28 +48,55 @@ async function main() {
       update: {
         name: n.name,
         ws_url: n.wsUrl,
+        protocol_family: n.protocolFamily ?? 'clearnode',
+        protocol_version: n.protocolVersion ?? 'v0',
+        sync_enabled: n.syncEnabled ?? true,
+        is_primary: n.isPrimary ?? false,
+        node_runtime_version: n.nodeRuntimeVersion ?? null,
+        supported_sig_validators_base64: n.supportedSigValidatorsBase64 ?? null,
+        last_config_at: n.lastConfigAt ? new Date(n.lastConfigAt) : null,
+        last_config_raw_payload:
+          n.lastConfigRawPayload === undefined
+            ? undefined
+            : (n.lastConfigRawPayload as Prisma.InputJsonValue),
         website_host: n.websiteHost ?? null,
         icon_key: n.iconKey ?? null,
         description: n.description ?? null,
+        address: n.address ?? null,
+        featured: n.featured ?? false,
+        status: n.status ?? 'unknown',
+        available: n.available ?? false,
         country_code: n.country,
         region: n.region as NodeRegion,
         latitude: D(n.lat),
         longitude: D(n.lng),
-        // status/available to health worker to manage
       },
       create: {
         slug: n.slug,
         name: n.name,
         ws_url: n.wsUrl,
+        protocol_family: n.protocolFamily ?? 'clearnode',
+        protocol_version: n.protocolVersion ?? 'v0',
+        sync_enabled: n.syncEnabled ?? true,
+        is_primary: n.isPrimary ?? false,
+        node_runtime_version: n.nodeRuntimeVersion ?? null,
+        supported_sig_validators_base64: n.supportedSigValidatorsBase64 ?? null,
+        last_config_at: n.lastConfigAt ? new Date(n.lastConfigAt) : null,
+        last_config_raw_payload:
+          n.lastConfigRawPayload === undefined
+            ? undefined
+            : (n.lastConfigRawPayload as Prisma.InputJsonValue),
         website_host: n.websiteHost ?? null,
         icon_key: n.iconKey ?? null,
         description: n.description ?? null,
+        address: n.address ?? null,
+        featured: n.featured ?? false,
         country_code: n.country,
         region: n.region as NodeRegion,
         latitude: D(n.lat),
         longitude: D(n.lng),
-        status: 'unknown',
-        available: false,
+        status: n.status ?? 'unknown',
+        available: n.available ?? false,
       },
     });
     upserts++;

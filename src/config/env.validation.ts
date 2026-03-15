@@ -25,6 +25,9 @@ export type EnvVars = {
   SYNC_APP_SESSIONS_REFRESH_MS: number;
   SYNC_TXS_PAGE_SIZE: number;
   SYNC_TXS_BUDGET_MS: number;
+  ONCHAIN_INDEXER_ENABLED: string;
+  ONCHAIN_SYNC_INTERVAL_MS: number;
+  ONCHAIN_MAX_CHAINS_PER_TICK: number;
 
   RATE_LIMIT_RPM: number;
   CORS_ORIGINS: string;
@@ -68,6 +71,9 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
     .default(5 * 60 * 1000),
   SYNC_TXS_PAGE_SIZE: Joi.number().integer().min(50).max(1000).default(200),
   SYNC_TXS_BUDGET_MS: Joi.number().integer().min(1000).default(10_000),
+  ONCHAIN_INDEXER_ENABLED: Joi.string().valid('true', 'false').default('false'),
+  ONCHAIN_SYNC_INTERVAL_MS: Joi.number().integer().min(5_000).default(30_000),
+  ONCHAIN_MAX_CHAINS_PER_TICK: Joi.number().integer().min(1).max(100).default(10),
 
   RATE_LIMIT_RPM: Joi.number().integer().min(30).default(60),
   CORS_ORIGINS: Joi.string().default('*'),

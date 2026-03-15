@@ -152,10 +152,14 @@ enum NodeRegion {
 }
 
 model Node {
-  id          String  @id @default(cuid())
+  id          String  @id @default(dbgenerated("replace(gen_random_uuid()::text, '-'::text, ''::text)"))
   slug        String  @unique // kebab-case stable id
   name        String
   ws_url      String  @db.Text // public WS endpoint to connect
+  protocol_family  String @default("clearnode") @db.VarChar(64)
+  protocol_version String @default("v0") @db.VarChar(32)
+  sync_enabled     Boolean @default(true)
+  is_primary       Boolean @default(false)
   description String? @db.Text
   address     String? @db.VarChar(255) // node address for frontend lookup
 
@@ -172,6 +176,10 @@ model Node {
   featured     Boolean   @default(false) // certified/featured nodes like WalletConnect
   latency_ms   Int?
   last_seen_at DateTime?
+  node_runtime_version             String?   @db.VarChar(128)
+  supported_sig_validators_base64  String?   @db.Text
+  last_config_at                   DateTime?
+  last_config_raw_payload          Json?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -181,7 +189,277 @@ model Node {
   @@index([country_code])
   @@index([status, updated_at])
   @@index([featured])
+  @@index([sync_enabled])
+  @@index([is_primary])
+  @@index([protocol_family, protocol_version])
+  @@index([last_config_at])
   @@index([latitude, longitude])
   @@index([updated_at])
   @@map("nodes")
+}
+
+model NodeSyncState {
+  id              String   @id @default(cuid())
+  node_id         String
+  resource        String
+  cursor_json     Json?
+  last_success_at DateTime?
+  last_error      String?  @db.Text
+  retry_count     Int      @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([node_id, resource])
+  @@index([resource, updated_at])
+  @@index([node_id, updated_at])
+  @@map("node_sync_state")
+}
+
+model OnchainChainConfig {
+  chain_id           BigInt   @id
+  channel_hub_address String   @db.VarChar(255)
+  locking_contract_address String? @db.VarChar(255)
+  rpc_url            String?  @db.Text
+  enabled            Boolean  @default(true)
+  start_block        BigInt?
+  last_synced_block  BigInt?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@index([enabled, chain_id])
+  @@map("onchain_chain_configs")
+}
+
+model NodeBlockchainConfig {
+  id                       String   @id @default(cuid())
+  node_id                  String
+  blockchain_id            String   @db.VarChar(64)
+  name                     String?  @db.VarChar(128)
+  channel_hub_address      String?  @db.VarChar(255)
+  locking_contract_address String?  @db.VarChar(255)
+  raw_payload              Json?
+  last_config_at           DateTime @default(now())
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@unique([node_id, blockchain_id])
+  @@index([node_id, updated_at])
+  @@index([blockchain_id, updated_at])
+  @@map("node_blockchain_configs")
+}
+
+model NodeConfigSnapshot {
+  id                              String   @id @default(cuid())
+  node_id                         String
+  node_address                    String?  @db.VarChar(255)
+  node_runtime_version            String?  @db.VarChar(128)
+  supported_sig_validators_base64 String?  @db.Text
+  blockchains_json                Json
+  raw_payload                     Json
+  captured_at                     DateTime @default(now())
+  created_at                      DateTime @default(now())
+
+  @@index([node_id, captured_at])
+  @@index([captured_at])
+  @@map("node_config_snapshots")
+}
+
+model OnchainEvent {
+  id               String   @id @default(cuid())
+  chain_id         BigInt
+  contract_address String   @db.VarChar(255)
+  tx_hash          String   @db.VarChar(255)
+  log_index        Int
+  block_number     BigInt
+  block_timestamp  DateTime
+  event_name       String   @db.VarChar(128)
+  channel_id       String?
+  user_wallet      String?  @db.VarChar(255)
+  node_address     String?  @db.VarChar(255)
+  raw_payload      Json
+  observed_at      DateTime @default(now())
+  created_at       DateTime @default(now())
+
+  @@unique([chain_id, tx_hash, log_index])
+  @@index([chain_id, block_number])
+  @@index([event_name, block_timestamp])
+  @@index([user_wallet, block_timestamp])
+  @@map("onchain_events")
+}
+
+model OffchainBalanceSnapshot {
+  id               String   @id @default(cuid())
+  node_id          String
+  wallet           String   @db.VarChar(255)
+  asset            String   @db.VarChar(64)
+  blockchain_id    String   @db.VarChar(64)
+  offchain_balance String
+  source_ref       String?  @db.VarChar(255)
+  raw_payload      Json?
+  captured_at      DateTime @default(now())
+  created_at       DateTime @default(now())
+
+  @@index([wallet, captured_at])
+  @@index([node_id, captured_at])
+  @@index([asset, blockchain_id, captured_at])
+  @@map("offchain_balance_snapshots")
+}
+
+model OnchainBalanceSnapshot {
+  id              String   @id @default(cuid())
+  node_id         String
+  wallet          String   @db.VarChar(255)
+  asset           String   @db.VarChar(64)
+  blockchain_id   String   @db.VarChar(64)
+  onchain_balance String
+  source_ref      String?  @db.VarChar(255)
+  raw_payload     Json?
+  captured_at     DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  @@index([wallet, captured_at])
+  @@index([node_id, captured_at])
+  @@index([asset, blockchain_id, captured_at])
+  @@map("onchain_balance_snapshots")
+}
+
+model WalletBalanceLatest {
+  id               String   @id @default(cuid())
+  node_id          String
+  wallet           String   @db.VarChar(255)
+  asset            String   @db.VarChar(64)
+  blockchain_id    String   @db.VarChar(64)
+  offchain_balance String?
+  onchain_balance  String?
+  balance_delta    String?
+  offchain_as_of   DateTime?
+  onchain_as_of    DateTime?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@unique([node_id, wallet, asset, blockchain_id])
+  @@index([wallet, updated_at])
+  @@index([node_id, updated_at])
+  @@map("wallet_balance_latest")
+}
+
+model AssetToken {
+  id              String   @id @default(cuid())
+  node_id         String
+  asset_symbol    String   @db.VarChar(64)
+  token_address   String   @db.VarChar(255)
+  blockchain_id   String   @db.VarChar(64)
+  decimals        String?  @db.VarChar(32)
+  raw_payload     Json?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([node_id, asset_symbol, token_address, blockchain_id])
+  @@index([asset_symbol, blockchain_id])
+  @@map("asset_tokens")
+}
+
+model State {
+  id              String   @id @default(cuid())
+  node_id         String
+  state_id        String
+  channel_id      String?
+  user_wallet     String   @db.VarChar(255)
+  asset           String   @db.VarChar(64)
+  epoch           String?  @db.VarChar(64)
+  version         String?  @db.VarChar(64)
+  transition_type String?  @db.VarChar(64)
+  raw_payload     Json
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([node_id, state_id])
+  @@index([user_wallet, updated_at])
+  @@index([channel_id, updated_at])
+  @@map("states")
+}
+
+model App {
+  id           String   @id @default(cuid())
+  node_id      String
+  app_id       String
+  owner_wallet String?  @db.VarChar(255)
+  version      String?  @db.VarChar(64)
+  raw_payload  Json?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@unique([node_id, app_id])
+  @@index([owner_wallet, updated_at])
+  @@map("apps")
+}
+
+model AppAllocation {
+  id             String   @id @default(cuid())
+  node_id        String
+  app_session_id String
+  participant    String   @db.VarChar(255)
+  asset          String   @db.VarChar(64)
+  amount         String
+  raw_payload    Json?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@unique([node_id, app_session_id, participant, asset])
+  @@index([app_session_id, updated_at])
+  @@index([participant, updated_at])
+  @@map("app_allocations")
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  node_id       String
+  wallet        String   @db.VarChar(255)
+  tx_id         String
+  blockchain_id String   @db.VarChar(64)
+  asset         String   @db.VarChar(64)
+  tx_type       String   @db.VarChar(64)
+  amount        String
+  source        String   @db.VarChar(32) // offchain|onchain
+  raw_payload   Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([node_id, source, tx_id])
+  @@index([wallet, created_at])
+  @@index([source, created_at])
+  @@index([asset, blockchain_id, created_at])
+  @@map("transactions")
+}
+
+model ActionAllowanceSnapshot {
+  id              String   @id @default(cuid())
+  node_id         String
+  wallet          String   @db.VarChar(255)
+  allowances_json Json
+  raw_payload     Json?
+  captured_at     DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  @@index([wallet, captured_at])
+  @@index([node_id, captured_at])
+  @@map("action_allowance_snapshots")
+}
+
+model SessionKeyState {
+  id           String   @id @default(cuid())
+  node_id      String
+  key_scope    String   @db.VarChar(64) // channels|app_sessions
+  user_address String   @db.VarChar(255)
+  session_key  String   @db.VarChar(255)
+  expires_at   String?  @db.VarChar(64)
+  raw_payload  Json?
+  captured_at  DateTime @default(now())
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@index([user_address, captured_at])
+  @@index([node_id, captured_at])
+  @@index([key_scope, captured_at])
+  @@map("session_key_states")
 }

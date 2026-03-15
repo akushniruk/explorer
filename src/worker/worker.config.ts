@@ -26,4 +26,9 @@ export default registerAs('worker', () => ({
     rateLimitRpm: Number(process.env.RATE_LIMIT_RPM ?? 60),
     corsOrigins: process.env.CORS_ORIGINS ?? '*',
   },
+  onchain: {
+    enabled: String(process.env.ONCHAIN_INDEXER_ENABLED ?? 'false').toLowerCase() === 'true',
+    syncIntervalMs: Number(process.env.ONCHAIN_SYNC_INTERVAL_MS ?? 30_000),
+    maxChainsPerTick: Number(process.env.ONCHAIN_MAX_CHAINS_PER_TICK ?? 10),
+  },
 }));

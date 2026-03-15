@@ -25,7 +25,27 @@ type NodeView = {
   updated_at: Date;
 };
 
-function serialize(node: Omit<DbNode, 'id' | 'featured' | 'created_at'>): NodeView {
+type NodeSelectShape = Pick<
+  DbNode,
+  | 'slug'
+  | 'name'
+  | 'ws_url'
+  | 'address'
+  | 'website_host'
+  | 'icon_key'
+  | 'description'
+  | 'country_code'
+  | 'region'
+  | 'latitude'
+  | 'longitude'
+  | 'status'
+  | 'available'
+  | 'latency_ms'
+  | 'last_seen_at'
+  | 'updated_at'
+>;
+
+function serialize(node: NodeSelectShape): NodeView {
   return {
     slug: node.slug,
     name: node.name,
@@ -274,13 +294,15 @@ export class NodeService {
     }
 
     // Fetch from database
-    const node = await this.prisma.node.findFirst({
+    const nodes = await this.prisma.node.findMany({
       where: {
         address: {
           equals: address,
           mode: 'insensitive',
         },
       },
+      orderBy: [{ is_primary: 'desc' }, { updated_at: 'desc' }],
+      take: 2,
       select: {
         slug: true,
         name: true,
@@ -301,11 +323,15 @@ export class NodeService {
       },
     });
 
-    if (!node) {
+    if (nodes.length === 0) {
       throw new Error('Node not found');
     }
 
-    const result = serialize(node);
+    if (nodes.length > 1) {
+      throw new Error('Multiple nodes found for address; expected a unique node address');
+    }
+
+    const result = serialize(nodes[0]);
 
     // Store in cache
     await this.cacheManager.set(cacheKey, result, CACHE_TTL.NODE_DETAIL);
