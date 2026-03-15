@@ -83,7 +83,7 @@ export class NodeService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  async single(q: Pick<ListNodesQueryDto, 'q'>) {
+  async single(q: Pick<ListNodesQueryDto, 'q'>): Promise<any> {
     if (!q.q) {
       throw new Error('Query parameter "q" is required');
     }
@@ -133,7 +133,7 @@ export class NodeService {
     return result;
   }
 
-  async list(q: ListNodesQueryDto) {
+  async list(q: ListNodesQueryDto): Promise<any> {
     const cacheKey = CacheKeys.nodeList(q);
 
     // Try to get from cache
@@ -215,7 +215,9 @@ export class NodeService {
     return result;
   }
 
-  async count(filters: Pick<ListNodesQueryDto, 'q' | 'country' | 'region' | 'status' | 'bbox'>) {
+  async count(
+    filters: Pick<ListNodesQueryDto, 'q' | 'country' | 'region' | 'status' | 'bbox'>,
+  ): Promise<any> {
     const cacheKey = CacheKeys.nodeCount(filters);
 
     // Try to get from cache
@@ -256,7 +258,7 @@ export class NodeService {
     return result;
   }
 
-  async countActive() {
+  async countActive(): Promise<any> {
     const cacheKey = CacheKeys.nodeCountActive();
 
     // Try to get from cache
@@ -280,7 +282,7 @@ export class NodeService {
     return result;
   }
 
-  async findByAddress(address: string) {
+  async findByAddress(address: string): Promise<any> {
     if (!address) {
       throw new Error('Address parameter is required');
     }

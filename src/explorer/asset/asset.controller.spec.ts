@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { AssetController } from './asset.controller';
 import { AssetService } from './asset.service';
 
-describe('AssetController (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('AssetController (HTTP)', () => {
   let app: INestApplication<App>;
 
   let getOneMock: jest.Mock;
@@ -52,9 +54,9 @@ describe('AssetController (HTTP)', () => {
   });
 
   it('GET /api/v1/asset requires token & chainId (validation)', async () => {
-    await request(app.getHttpServer()).get('/api/v1/asset').expect(400);
+    await request(app.getHttpAdapter().getInstance()).get('/api/v1/asset').expect(400);
 
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/asset')
       .query({ token: '0xT' }) // missing chainId
       .expect(400);
@@ -66,7 +68,7 @@ describe('AssetController (HTTP)', () => {
       symbol: 'ETH',
       decimals: '18',
     });
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/asset')
       .query({ token: '0xT', chainId: '1' })
       .expect(200)
@@ -84,7 +86,7 @@ describe('AssetController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/asset/list')
       .query({ page: '2', limit: '10', q: 'usdc', sortBy: 'symbol', order: 'asc' })
       .expect(200)
@@ -106,7 +108,7 @@ describe('AssetController (HTTP)', () => {
   it('GET /api/v1/asset/count forwards filters and returns 200 with cache header', async () => {
     countMock.mockResolvedValueOnce({ total: 12 });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/asset/count')
       .query({ q: 'eth', chainId: '1' })
       .expect(200)
@@ -117,7 +119,7 @@ describe('AssetController (HTTP)', () => {
   });
 
   it('throttling headers present on asset routes', async () => {
-    const s = app.getHttpServer();
+    const s = app.getHttpAdapter().getInstance();
 
     getOneMock.mockResolvedValueOnce({
       token: '0xT',

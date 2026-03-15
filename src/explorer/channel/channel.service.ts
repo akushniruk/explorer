@@ -14,7 +14,7 @@ export class ChannelService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  async getOne(q: GetChannelQueryDto) {
+  async getOne(q: GetChannelQueryDto): Promise<any> {
     const cacheKey = CacheKeys.channelDetail(q.channelId);
 
     // Try to get from cache
@@ -60,7 +60,7 @@ export class ChannelService {
     return result;
   }
 
-  async list(q: ListChannelsQueryDto) {
+  async list(q: ListChannelsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.channelList(q);
 
     // Try to get from cache
@@ -143,7 +143,7 @@ export class ChannelService {
     return result;
   }
 
-  async count(filters: Pick<ListChannelsQueryDto, 'status' | 'token' | 'chainId'>) {
+  async count(filters: Pick<ListChannelsQueryDto, 'status' | 'token' | 'chainId'>): Promise<any> {
     const cacheKey = CacheKeys.channelCount(filters);
 
     // Try to get from cache
@@ -168,7 +168,7 @@ export class ChannelService {
     return result;
   }
 
-  async getByWallet(wallet: string, query: ListChannelsQueryDto) {
+  async getByWallet(wallet: string, query: ListChannelsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.channelByWallet(wallet, query);
 
     // Try to get from cache
@@ -248,7 +248,7 @@ export class ChannelService {
     return result;
   }
 
-  async getByParticipant(participant: string, query: ListChannelsQueryDto) {
+  async getByParticipant(participant: string, query: ListChannelsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.channelByParticipant(participant, query);
 
     // Try to get from cache
@@ -326,7 +326,7 @@ export class ChannelService {
     return result;
   }
 
-  async getByAddress(address: string, query: ListChannelsQueryDto) {
+  async getByAddress(address: string, query: ListChannelsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.channelByAddress(address, query);
 
     // Try to get from cache

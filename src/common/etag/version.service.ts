@@ -16,8 +16,13 @@ export class VersionService {
    */
   normalizeQuery(query: Record<string, unknown>): string {
     const normalize = (obj: unknown): unknown => {
-      if (obj === null || obj === undefined) {
-        return obj;
+      if (obj === null) {
+        return null;
+      }
+
+      if (obj === undefined) {
+        // JSON.stringify drops undefined fields. Converting to null keeps key presence stable.
+        return null;
       }
 
       if (Array.isArray(obj)) {
@@ -66,6 +71,9 @@ export class VersionService {
       version = result.v;
       count = result.c;
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Unknown resource:')) {
+        throw error;
+      }
       this.logger.warn(`Failed to get version for resource ${resource}: ${error.message}`);
       // Fallback to current timestamp and 0 count
       version = BigInt(Math.floor(Date.now() / 1000));

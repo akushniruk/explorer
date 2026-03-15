@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { NotFoundException } from '@nestjs/common';
 import { AssetService } from './asset.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -43,7 +44,11 @@ describe('AssetService', () => {
     } as unknown as PrismaService;
 
     const mod = await Test.createTestingModule({
-      providers: [AssetService, { provide: PrismaService, useValue: prismaStub }],
+      providers: [
+        AssetService,
+        { provide: PrismaService, useValue: prismaStub },
+        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn() } },
+      ],
     }).compile();
 
     service = mod.get(AssetService);

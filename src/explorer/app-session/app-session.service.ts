@@ -39,7 +39,7 @@ export class AppSessionService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  async getOne(q: GetAppSessionQueryDto) {
+  async getOne(q: GetAppSessionQueryDto): Promise<any> {
     const cacheKey = CacheKeys.appSessionDetail(q.sessionId);
 
     // Try to get from cache
@@ -63,7 +63,7 @@ export class AppSessionService {
     return result;
   }
 
-  async list(q: ListAppSessionsQueryDto) {
+  async list(q: ListAppSessionsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.appSessionList(q);
 
     // Try to get from cache
@@ -118,7 +118,7 @@ export class AppSessionService {
 
   async count(
     filters: Pick<ListAppSessionsQueryDto, 'status' | 'channelId' | 'participant' | 'q'>,
-  ) {
+  ): Promise<any> {
     const cacheKey = CacheKeys.appSessionCount(filters);
 
     // Try to get from cache

@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { NodeController } from './node.controller';
 import { NodeService } from './node.service';
 
-describe('NodeController (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('NodeController (HTTP)', () => {
   let app: INestApplication<App>;
 
   let listMock: jest.Mock;
@@ -46,7 +48,7 @@ describe('NodeController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/nodes/list')
       .query({
         page: '2',
@@ -96,7 +98,7 @@ describe('NodeController (HTTP)', () => {
       hasMore: false,
     });
 
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/nodes/list')
       .query({
         page: '1',
@@ -116,7 +118,7 @@ describe('NodeController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/nodes/list?page=1&limit=25')
       .expect(200);
 

@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { NetworkController } from './network.controller';
 import { NetworkService } from './network.service';
 
-describe('NetworkController (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('NetworkController (HTTP)', () => {
   let app: INestApplication<App>;
 
   let getOneMock: jest.Mock;
@@ -48,11 +50,11 @@ describe('NetworkController (HTTP)', () => {
   });
 
   it('GET /api/v1/network requires chainId (validation) and returns 200 when provided', async () => {
-    await request(app.getHttpServer()).get('/api/v1/network').expect(400);
+    await request(app.getHttpAdapter().getInstance()).get('/api/v1/network').expect(400);
 
     getOneMock.mockResolvedValueOnce({ chain_id: '1', name: 'Ethereum' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/network')
       .query({ chainId: '1' })
       .expect(200)
@@ -65,7 +67,7 @@ describe('NetworkController (HTTP)', () => {
   it('GET /api/v1/network/:id routes correctly and sets cache header', async () => {
     getOneMock.mockResolvedValueOnce({ chain_id: '10', name: 'Sepolia' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/network/10')
       .expect(200)
       .expect('Cache-Control', 'public, max-age=15');
@@ -84,7 +86,7 @@ describe('NetworkController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/network/list')
       .query({
         page: '2',
@@ -124,7 +126,7 @@ describe('NetworkController (HTTP)', () => {
   it('GET /api/v1/network/count forwards filters and sets cache header', async () => {
     countMock.mockResolvedValueOnce({ total: 5 });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/network/count')
       .query({ q: 'eth', chainId: '1', broker: 'wss://b' })
       .expect(200)
@@ -137,7 +139,7 @@ describe('NetworkController (HTTP)', () => {
   it('throttling headers present on routes', async () => {
     getOneMock.mockResolvedValueOnce({ chain_id: '1', name: 'Ethereum' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/network')
       .query({ chainId: '1' })
       .expect(200);

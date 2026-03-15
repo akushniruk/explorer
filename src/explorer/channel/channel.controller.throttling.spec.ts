@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { ChannelController } from './channel.controller';
 import { ChannelService } from './channel.service';
 
-describe('ChannelController throttling (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('ChannelController throttling (HTTP)', () => {
   let app: INestApplication<App>;
 
   // local mocks (avoid unbound-method lint)

@@ -14,7 +14,7 @@ export class NetworkService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  async getOne(q: GetNetworkQueryDto) {
+  async getOne(q: GetNetworkQueryDto): Promise<any> {
     const cacheKey = CacheKeys.networkDetail(q.chainId);
 
     // Try to get from cache
@@ -41,7 +41,7 @@ export class NetworkService {
     return result;
   }
 
-  async list(q: ListNetworksQueryDto) {
+  async list(q: ListNetworksQueryDto): Promise<any> {
     const cacheKey = CacheKeys.networkList(q);
 
     // Try to get from cache
@@ -90,7 +90,7 @@ export class NetworkService {
     return result;
   }
 
-  async count(filters: Pick<ListNetworksQueryDto, 'chainId' | 'q' | 'broker'>) {
+  async count(filters: Pick<ListNetworksQueryDto, 'chainId' | 'q' | 'broker'>): Promise<any> {
     const cacheKey = CacheKeys.networkCount(filters);
 
     // Try to get from cache

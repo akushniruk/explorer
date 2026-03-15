@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { NotFoundException } from '@nestjs/common';
 import { AppSessionService } from './app-session.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -53,7 +54,11 @@ describe('AppSessionService', () => {
     } as unknown as PrismaService;
 
     const mod = await Test.createTestingModule({
-      providers: [AppSessionService, { provide: PrismaService, useValue: prismaStub }],
+      providers: [
+        AppSessionService,
+        { provide: PrismaService, useValue: prismaStub },
+        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn() } },
+      ],
     }).compile();
 
     service = mod.get(AppSessionService);

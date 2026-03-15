@@ -2,18 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './asset.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { YellowApiService } from '../yellow-api.service';
+import { CacheService } from '../../common/cache';
 
 describe('AssetService', () => {
   let service: AssetService;
 
   const mockPrismaService = {
-    asset: {
-      upsert: jest.fn(),
-    },
+    $executeRawUnsafe: jest.fn(),
   };
 
   const mockYellowApiService = {
     getAssets: jest.fn(),
+  };
+
+  const mockCacheService = {
+    invalidateAssets: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -27,6 +30,10 @@ describe('AssetService', () => {
         {
           provide: YellowApiService,
           useValue: mockYellowApiService,
+        },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
         },
       ],
     }).compile();

@@ -6,7 +6,7 @@ describe('VersionService', () => {
   let service: VersionService;
 
   const mockPrismaService = {
-    $queryRaw: jest.fn(),
+    $queryRawUnsafe: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -117,29 +117,35 @@ describe('VersionService', () => {
 
   describe('getVersion', () => {
     it('should generate version for nodes resource', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ v: BigInt(1704110400), c: BigInt(50) }]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { v: BigInt(1704110400), c: BigInt(50) },
+      ]);
 
       const version = await service.getVersion('nodes', { page: 1, limit: 10 });
 
       expect(version).toMatch(/^nodes:1704110400:50:[a-f0-9]{16}$/);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledWith(
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('FROM nodes'),
       );
     });
 
     it('should generate version for channels resource', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ v: BigInt(1704110500), c: BigInt(25) }]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { v: BigInt(1704110500), c: BigInt(25) },
+      ]);
 
       const version = await service.getVersion('channels', { status: 'open' });
 
       expect(version).toMatch(/^channels:1704110500:25:[a-f0-9]{16}$/);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledWith(
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('FROM channels'),
       );
     });
 
     it('should include query hash in version', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ v: BigInt(1704110400), c: BigInt(50) }]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { v: BigInt(1704110400), c: BigInt(50) },
+      ]);
 
       const version1 = await service.getVersion('nodes', { page: 1, limit: 10 });
       const version2 = await service.getVersion('nodes', { page: 2, limit: 10 });
@@ -149,7 +155,9 @@ describe('VersionService', () => {
     });
 
     it('should generate same version for same query parameters', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ v: BigInt(1704110400), c: BigInt(50) }]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { v: BigInt(1704110400), c: BigInt(50) },
+      ]);
 
       const query = { page: 1, limit: 10, status: 'active' };
       const version1 = await service.getVersion('nodes', query);
@@ -159,7 +167,7 @@ describe('VersionService', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockPrismaService.$queryRaw.mockRejectedValue(new Error('DB connection failed'));
+      mockPrismaService.$queryRawUnsafe.mockRejectedValue(new Error('DB connection failed'));
 
       const version = await service.getVersion('nodes', {});
 
@@ -170,7 +178,7 @@ describe('VersionService', () => {
     });
 
     it('should handle empty query result', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([]);
 
       const version = await service.getVersion('nodes', {});
 
@@ -182,14 +190,14 @@ describe('VersionService', () => {
       const tables = ['nodes', 'channels', 'assets', 'networks', 'app_sessions'];
 
       for (let i = 0; i < resources.length; i++) {
-        mockPrismaService.$queryRaw.mockResolvedValue([
+        mockPrismaService.$queryRawUnsafe.mockResolvedValue([
           { v: BigInt(1704110400 + i), c: BigInt(10 + i) },
         ]);
 
         const version = await service.getVersion(resources[i], {});
 
         expect(version).toMatch(new RegExp(`^${resources[i]}:\\d+:\\d+:[a-f0-9]{16}$`));
-        expect(mockPrismaService.$queryRaw).toHaveBeenCalledWith(
+        expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
           expect.stringContaining(`FROM ${tables[i]}`),
         );
       }
@@ -200,11 +208,13 @@ describe('VersionService', () => {
     });
 
     it('should properly escape table names in queries', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ v: BigInt(1704110400), c: BigInt(50) }]);
+      mockPrismaService.$queryRawUnsafe.mockResolvedValue([
+        { v: BigInt(1704110400), c: BigInt(50) },
+      ]);
 
       await service.getVersion('app-sessions', {});
 
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledWith(
+      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('FROM app_sessions'),
       );
     });

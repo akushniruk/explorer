@@ -1,16 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChannelService } from './channel.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GetChannelsResponseParams, RPCChannelUpdateWithWallet } from '@erc7824/nitrolite';
+import { YellowApiService } from '../yellow-api.service';
+import { CacheService } from '../../common/cache';
 
 describe('ChannelService', () => {
   let service: ChannelService;
-  let prismaService: jest.Mocked<PrismaService>;
 
   const mockPrismaService = {
-    channel: {
-      upsert: jest.fn(),
-    },
+    $executeRawUnsafe: jest.fn(),
+  };
+
+  const mockYellowApiService = {
+    getAssets: jest.fn(),
+  };
+
+  const mockCacheService = {
+    invalidateAssets: jest.fn(),
+    invalidateChannels: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -21,14 +28,19 @@ describe('ChannelService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: YellowApiService,
+          useValue: mockYellowApiService,
+        },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
+        },
       ],
     }).compile();
 
     service = module.get<ChannelService>(ChannelService);
-    prismaService = module.get(PrismaService);
-  });
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
@@ -36,111 +48,47 @@ describe('ChannelService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('processChannels', () => {
-    it('should handle empty channel array', async () => {
-      await service.processChannels({ channels: [] });
-      expect(mockPrismaService.channel.upsert).not.toHaveBeenCalled();
-    });
+  it('should no-op on empty channel list', async () => {
+    await service.processChannels({ channels: [] } as any);
 
-    it('should handle null channels', async () => {
-      await service.processChannels(null as unknown as GetChannelsResponseParams);
-      expect(mockPrismaService.channel.upsert).not.toHaveBeenCalled();
-    });
+    expect(mockYellowApiService.getAssets).not.toHaveBeenCalled();
+    expect(mockPrismaService.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(mockCacheService.invalidateChannels).not.toHaveBeenCalled();
+  });
 
-    it('should process single channel', async () => {
-      const mockChannel: RPCChannelUpdateWithWallet = {
-        channelId: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
-        participant: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
-        status: 'Open' as any,
-        token: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
-        wallet: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
-        amount: BigInt(1000),
-        chainId: 1,
-        adjudicator: '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`,
-        challenge: 123,
-        nonce: 1,
-        version: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+  it('should process channels and write bulk SQL once for channels chunk', async () => {
+    mockYellowApiService.getAssets.mockResolvedValue({ params: { assets: [] } });
+    mockPrismaService.$executeRawUnsafe.mockResolvedValue(1);
 
-      mockPrismaService.channel.upsert.mockResolvedValue(mockChannel as any);
+    const now = new Date();
 
-      await service.processChannels({ channels: [mockChannel] });
-
-      expect(mockPrismaService.channel.upsert).toHaveBeenCalledTimes(1);
-      expect(mockPrismaService.channel.upsert).toHaveBeenCalledWith({
-        where: { channel_id: '0x1234567890abcdef1234567890abcdef12345678' },
-        create: {
-          channel_id: '0x1234567890abcdef1234567890abcdef12345678',
+    await service.processChannels({
+      channels: [
+        {
+          channelId: '0x1234567890abcdef1234567890abcdef12345678',
           participant: '0x1234567890abcdef1234567890abcdef12345678',
           status: 'Open',
           token: '0x1234567890abcdef1234567890abcdef12345678',
           wallet: '0x1234567890abcdef1234567890abcdef12345678',
           amount: BigInt(1000),
-          chain_id: 1,
+          chainId: 1,
           adjudicator: '0x1234567890abcdef1234567890abcdef12345678',
           challenge: 123,
           nonce: 1,
           version: 1,
+          createdAt: now,
+          updatedAt: now,
         },
-        update: {
-          channel_id: '0x1234567890abcdef1234567890abcdef12345678',
-          participant: '0x1234567890abcdef1234567890abcdef12345678',
-          status: 'Open',
-          token: '0x1234567890abcdef1234567890abcdef12345678',
-          wallet: '0x1234567890abcdef1234567890abcdef12345678',
-          amount: BigInt(1000),
-          chain_id: 1,
-          adjudicator: '0x1234567890abcdef1234567890abcdef12345678',
-          challenge: 123,
-          nonce: 1,
-          version: 1,
-        },
-      });
-    });
+      ],
+    } as any);
 
-    it('should process multiple channels', async () => {
-      const mockChannels: RPCChannelUpdateWithWallet[] = [
-        {
-          channelId: '0x1111111111111111111111111111111111111111' as `0x${string}`,
-          participant: '0x2222222222222222222222222222222222222222' as `0x${string}`,
-          status: 'Open' as any,
-          token: '0x3333333333333333333333333333333333333333' as `0x${string}`,
-          wallet: '0x4444444444444444444444444444444444444444' as `0x${string}`,
-          amount: BigInt(1000),
-          chainId: 1,
-          adjudicator: '0x5555555555555555555555555555555555555555' as `0x${string}`,
-          challenge: 123,
-          nonce: 1,
-          version: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          channelId: '0x6666666666666666666666666666666666666666' as `0x${string}`,
-          participant: '0x7777777777777777777777777777777777777777' as `0x${string}`,
-          status: 'Closing' as any,
-          token: '0x8888888888888888888888888888888888888888' as `0x${string}`,
-          wallet: '0x9999999999999999999999999999999999999999' as `0x${string}`,
-          amount: BigInt(2000),
-          chainId: 1,
-          adjudicator: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as `0x${string}`,
-          challenge: 456,
-          nonce: 2,
-          version: 2,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
+    expect(mockYellowApiService.getAssets).toHaveBeenCalledWith(1);
+    expect(mockPrismaService.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(mockCacheService.invalidateChannels).toHaveBeenCalledTimes(1);
 
-      jest
-        .spyOn(prismaService.channel, 'upsert')
-        .mockImplementation(() => Promise.resolve({} as any));
+    const sql = mockPrismaService.$executeRawUnsafe.mock.calls[0][0] as string;
 
-      await service.processChannels({ channels: mockChannels });
-
-      expect(mockPrismaService.channel.upsert).toHaveBeenCalledTimes(2);
-    });
+    expect(sql).toContain('INSERT INTO "channels"');
+    expect(sql).toContain('ON CONFLICT ("channel_id")');
   });
 });

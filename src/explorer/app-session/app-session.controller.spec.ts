@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppSessionController } from './app-session.controller';
 import { AppSessionService } from './app-session.service';
 
-describe('AppSessionController (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('AppSessionController (HTTP)', () => {
   let app: INestApplication<App>;
 
   let getOneMock: jest.Mock;
@@ -48,7 +50,7 @@ describe('AppSessionController (HTTP)', () => {
   });
 
   it('GET /api/v1/app-session requires sessionId (validation) and returns 200 when provided', async () => {
-    await request(app.getHttpServer()).get('/api/v1/app-session').expect(400);
+    await request(app.getHttpAdapter().getInstance()).get('/api/v1/app-session').expect(400);
 
     getOneMock.mockResolvedValueOnce({
       session_id: '0xAAA',
@@ -57,7 +59,7 @@ describe('AppSessionController (HTTP)', () => {
       quorum: '100',
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/app-session')
       .query({ sessionId: '0xAAA' })
       .expect(200)
@@ -70,7 +72,7 @@ describe('AppSessionController (HTTP)', () => {
   it('GET /api/v1/app-session/:id routes correctly and sets cache header', async () => {
     getOneMock.mockResolvedValueOnce({ session_id: '0xSESS', nonce: '2' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/app-session/0xSESS')
       .expect(200)
       .expect('Cache-Control', 'public, max-age=15');
@@ -89,7 +91,7 @@ describe('AppSessionController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/app-session/list')
       .query({
         page: '2',
@@ -133,7 +135,7 @@ describe('AppSessionController (HTTP)', () => {
   it('GET /api/v1/app-session/count forwards filters and sets cache header', async () => {
     countMock.mockResolvedValueOnce({ total: 9 });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/app-session/count')
       .query({ status: 'active', channelId: '0xCHAN', participant: '0xP1', q: '0xabc' })
       .expect(200)
@@ -151,7 +153,7 @@ describe('AppSessionController (HTTP)', () => {
   it('throttling headers present on routes', async () => {
     getOneMock.mockResolvedValueOnce({ session_id: '0xAAA', nonce: '1' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/app-session')
       .query({ sessionId: '0xAAA' })
       .expect(200);

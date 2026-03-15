@@ -142,7 +142,7 @@ describe('YellowApiService', () => {
 
       expect(result.method).toBe('get_app_sessions');
       expect(result.requestId).toBe(123);
-      expect(result.params).toEqual([{ sessionId: 'test' }]);
+      expect(result.params).toEqual({ appSessions: [{ sessionId: 'test' }] });
     });
   });
 

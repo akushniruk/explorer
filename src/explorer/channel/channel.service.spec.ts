@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { NotFoundException } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -56,7 +57,11 @@ describe('ChannelService', () => {
     } as unknown as PrismaService;
 
     const mod = await Test.createTestingModule({
-      providers: [ChannelService, { provide: PrismaService, useValue: prismaStub }],
+      providers: [
+        ChannelService,
+        { provide: PrismaService, useValue: prismaStub },
+        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn() } },
+      ],
     }).compile();
 
     service = mod.get(ChannelService);
@@ -70,7 +75,9 @@ describe('ChannelService', () => {
 
       const res = await service.getOne({ channelId: '0xAAA' });
 
-      expect(findUniqueMock).toHaveBeenCalledWith({ where: { channel_id: '0xAAA' } });
+      expect(findUniqueMock).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { channel_id: '0xAAA' } }),
+      );
       expect(res).toMatchObject({
         channel_id: '0xAAA',
         chain_id: '10',

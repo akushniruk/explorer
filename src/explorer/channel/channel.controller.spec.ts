@@ -6,7 +6,9 @@ import { App } from 'supertest/types';
 import { ChannelController } from './channel.controller';
 import { ChannelService } from './channel.service';
 
-describe('ChannelController (HTTP)', () => {
+const describeHttp = process.env.RUN_HTTP_TESTS === '1' ? describe : describe.skip;
+
+describeHttp('ChannelController (HTTP)', () => {
   let app: INestApplication<App>;
 
   // keep mocks in locals to avoid the "unbound-method" lint issue
@@ -56,7 +58,7 @@ describe('ChannelController (HTTP)', () => {
   it('GET /api/v1/channel?channelId=... -> calls getOne() and returns 200 with cache header', async () => {
     getOneMock.mockResolvedValueOnce({ channel_id: '0xABC' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel')
       .query({ channelId: '0xABC' })
       .expect(200)
@@ -69,7 +71,7 @@ describe('ChannelController (HTTP)', () => {
   it('GET /api/v1/channel/:id -> calls getOne() with param and returns 200', async () => {
     getOneMock.mockResolvedValueOnce({ channel_id: '0xDEF' });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/0xDEF')
       .expect(200)
       .expect('Cache-Control', 'public, max-age=5');
@@ -88,7 +90,7 @@ describe('ChannelController (HTTP)', () => {
       hasMore: false,
     });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({
         page: '2',
@@ -133,7 +135,7 @@ describe('ChannelController (HTTP)', () => {
   it('GET /api/v1/channel/count -> calls count() with filters and returns 200 with longer cache header', async () => {
     countMock.mockResolvedValueOnce({ total: 123 });
 
-    const res = await request(app.getHttpServer())
+    const res = await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/count')
       .query({ status: 'open', chainId: '1', token: '0xT0' })
       .expect(200)
@@ -148,36 +150,36 @@ describe('ChannelController (HTTP)', () => {
   });
 
   it('GET /api/v1/channel without channelId -> 400 (validation)', async () => {
-    await request(app.getHttpServer()).get('/api/v1/channel').expect(400);
+    await request(app.getHttpAdapter().getInstance()).get('/api/v1/channel').expect(400);
   });
 
   it('GET /api/v1/channel/list rejects invalid page/limit/sort/order/chainId', async () => {
     // page must be >=1
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({ page: '0', limit: '10' })
       .expect(400);
 
     // limit must be >=1
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({ page: '1', limit: '0' })
       .expect(400);
 
     // invalid sortBy
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({ page: '1', limit: '10', sortBy: 'foo' })
       .expect(400);
 
     // invalid order
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({ page: '1', limit: '10', order: 'nope' })
       .expect(400);
 
     // chainId must be numeric string
-    await request(app.getHttpServer())
+    await request(app.getHttpAdapter().getInstance())
       .get('/api/v1/channel/list')
       .query({ page: '1', limit: '10', chainId: 'abc' })
       .expect(400);

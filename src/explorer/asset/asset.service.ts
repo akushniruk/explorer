@@ -14,7 +14,7 @@ export class AssetService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  async getOne(q: GetAssetQueryDto) {
+  async getOne(q: GetAssetQueryDto): Promise<any> {
     const cacheKey = CacheKeys.assetDetail(q.chainId, q.token);
 
     // Try to get from cache
@@ -43,7 +43,7 @@ export class AssetService {
     return result;
   }
 
-  async list(q: ListAssetsQueryDto) {
+  async list(q: ListAssetsQueryDto): Promise<any> {
     const cacheKey = CacheKeys.assetList(q);
 
     // Try to get from cache
@@ -93,7 +93,7 @@ export class AssetService {
     return result;
   }
 
-  async count(filters: Pick<ListAssetsQueryDto, 'token' | 'chainId' | 'q'>) {
+  async count(filters: Pick<ListAssetsQueryDto, 'token' | 'chainId' | 'q'>): Promise<any> {
     const cacheKey = CacheKeys.assetCount(filters);
 
     // Try to get from cache
