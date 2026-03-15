@@ -20,7 +20,10 @@
       "root": "src",
       "entryFile": "worker-onchain",
       "sourceRoot": "src",
-      "compilerOptions": { "deleteOutDir": false }
+      "compilerOptions": {
+        "deleteOutDir": false,
+        "assets": ["worker-onchain/abi/*.json"]
+      }
     }
   }
 }

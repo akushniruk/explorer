@@ -216,15 +216,13 @@ model NodeSyncState {
 }
 
 model OnchainChainConfig {
-  chain_id           BigInt   @id
+  chain_id            BigInt   @id
   channel_hub_address String   @db.VarChar(255)
-  locking_contract_address String? @db.VarChar(255)
-  rpc_url            String?  @db.Text
-  enabled            Boolean  @default(true)
-  start_block        BigInt?
-  last_synced_block  BigInt?
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+  enabled             Boolean  @default(true)
+  start_block         BigInt?
+  last_synced_block   BigInt?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   @@index([enabled, chain_id])
   @@map("onchain_chain_configs")

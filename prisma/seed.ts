@@ -105,6 +105,43 @@ async function main() {
   const total = await prisma.node.count();
 
   console.log(`Seeded/updated nodes: ${upserts}; total rows now: ${total}`);
+
+  // Seed onchain chain configs (ChannelHub deployments)
+  const chainConfigs = [
+    {
+      chain_id: 80002n,
+      channel_hub_address: '0x55D6f0A0322606447fbc612Cf58014Faed65aF9D',
+      start_block: 34883097n, // deployment block minus 10 for verification
+    },
+    {
+      chain_id: 11155111n,
+      channel_hub_address: '0xb7bE0E2007dDF320d680942cb9e008F986E74F83',
+      start_block: 10402866n, // deployment block minus 10 for verification
+    },
+  ];
+
+  let chainUpserts = 0;
+
+  for (const cc of chainConfigs) {
+    await prisma.onchainChainConfig.upsert({
+      where: { chain_id: cc.chain_id },
+      update: {
+        channel_hub_address: cc.channel_hub_address,
+        start_block: cc.start_block,
+      },
+      create: {
+        chain_id: cc.chain_id,
+        channel_hub_address: cc.channel_hub_address,
+        start_block: cc.start_block,
+        enabled: true,
+      },
+    });
+    chainUpserts++;
+  }
+
+  const chainTotal = await prisma.onchainChainConfig.count();
+
+  console.log(`Seeded/updated chain configs: ${chainUpserts}; total rows now: ${chainTotal}`);
 }
 
 main()

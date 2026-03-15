@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { ConfigType } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChainProcessorService } from './chain-processor.service';
 import workerOnchainCfg from './worker-onchain.config';
 
 const JOB_ID = 'onchain-indexer-sync';
@@ -15,6 +16,7 @@ export class OnchainIndexerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scheduler: SchedulerRegistry,
+    private readonly chainProcessor: ChainProcessorService,
     @Inject(workerOnchainCfg.KEY) private readonly cfg: ConfigType<typeof workerOnchainCfg>,
   ) {}
 
@@ -73,19 +75,14 @@ export class OnchainIndexerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      this.logger.log('Onchain sync tick started', { chains: chains.length });
-
       for (const chain of chains) {
-        // PR1: foundation only. Event indexing and enrichment wiring follow in next PRs.
-        this.logger.debug('Onchain chain scheduled for indexing', {
-          chainId: chain.chain_id.toString(),
-          channelHubAddress: chain.channel_hub_address,
-        });
+        await this.chainProcessor.processChain(chain);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const relationMissing =
-        message.includes('onchain_chain_configs') && message.toLowerCase().includes('does not exist');
+        message.includes('onchain_chain_configs') &&
+        message.toLowerCase().includes('does not exist');
 
       if (relationMissing) {
         if (!this.warnedMissingTable) {

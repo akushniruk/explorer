@@ -5,6 +5,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { envValidationSchema } from '../config/env.validation';
 import workerOnchainConfig from './worker-onchain.config';
 import { OnchainIndexerService } from './onchain-indexer.service';
+import { ChainProcessorService } from './chain-processor.service';
+import { EventDecoderService } from './event-decoder.service';
 
 @Module({
   imports: [
@@ -23,6 +25,6 @@ import { OnchainIndexerService } from './onchain-indexer.service';
       },
     }),
   ],
-  providers: [OnchainIndexerService],
+  providers: [EventDecoderService, ChainProcessorService, OnchainIndexerService],
 })
 export class WorkerOnchainModule {}

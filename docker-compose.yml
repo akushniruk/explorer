@@ -61,6 +61,7 @@ services:
       dockerfile: Dockerfile.worker.onchain
     environment:
       DATABASE_URL: postgresql://nexus:password@postgres:5432/nexus
+      INFURA_API_KEY: ${INFURA_API_KEY:-}
       OFFCHAIN_SYNC_ENABLED: "false"
       ONCHAIN_INDEXER_ENABLED: "true"
       NODE_ENV: production

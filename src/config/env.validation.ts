@@ -27,6 +27,7 @@ export type EnvVars = {
   SYNC_TXS_BUDGET_MS: number;
   OFFCHAIN_SYNC_ENABLED: string;
   ONCHAIN_INDEXER_ENABLED: string;
+  INFURA_API_KEY?: string;
   ONCHAIN_SYNC_INTERVAL_MS: number;
   ONCHAIN_MAX_CHAINS_PER_TICK: number;
 
@@ -78,6 +79,7 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
   SYNC_TXS_BUDGET_MS: Joi.number().integer().min(1000).default(10_000),
   OFFCHAIN_SYNC_ENABLED: Joi.string().valid('true', 'false').default('true'),
   ONCHAIN_INDEXER_ENABLED: Joi.string().valid('true', 'false').default('false'),
+  INFURA_API_KEY: Joi.string().trim().optional(),
   ONCHAIN_SYNC_INTERVAL_MS: Joi.number().integer().min(5_000).default(30_000),
   ONCHAIN_MAX_CHAINS_PER_TICK: Joi.number().integer().min(1).max(100).default(10),
 
