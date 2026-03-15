@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import workerCfg from '../worker.config';
+import { PrismaService } from '../prisma/prisma.service';
+import workerOnchainCfg from './worker-onchain.config';
 
 const JOB_ID = 'onchain-indexer-sync';
 
@@ -15,23 +15,23 @@ export class OnchainIndexerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scheduler: SchedulerRegistry,
-    @Inject(workerCfg.KEY) private readonly cfg: ConfigType<typeof workerCfg>,
+    @Inject(workerOnchainCfg.KEY) private readonly cfg: ConfigType<typeof workerOnchainCfg>,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (!this.cfg.onchain.enabled) {
+    if (!this.cfg.enabled) {
       this.logger.log('Onchain indexer disabled (ONCHAIN_INDEXER_ENABLED=false)');
 
       return;
     }
 
-    const intervalMs = Math.max(Number(this.cfg.onchain.syncIntervalMs ?? 30_000), 5_000);
+    const intervalMs = Math.max(Number(this.cfg.syncIntervalMs ?? 30_000), 5_000);
     const handle = setInterval(() => void this.handleSyncTick(), intervalMs);
 
     this.scheduler.addInterval(JOB_ID, handle);
     this.logger.log('Onchain indexer scheduled', {
       syncIntervalMs: intervalMs,
-      maxChainsPerTick: this.cfg.onchain.maxChainsPerTick,
+      maxChainsPerTick: this.cfg.maxChainsPerTick,
     });
 
     await this.handleSyncTick();
@@ -58,7 +58,7 @@ export class OnchainIndexerService implements OnModuleInit, OnModuleDestroy {
     this.isSyncing = true;
 
     try {
-      const maxChains = Math.max(Number(this.cfg.onchain.maxChainsPerTick ?? 10), 1);
+      const maxChains = Math.max(Number(this.cfg.maxChainsPerTick ?? 10), 1);
       const chains = await this.prisma.onchainChainConfig.findMany({
         where: { enabled: true },
         orderBy: { chain_id: 'asc' },

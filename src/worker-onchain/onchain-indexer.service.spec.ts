@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import workerCfg from '../worker.config';
+import { PrismaService } from '../prisma/prisma.service';
+import workerOnchainCfg from './worker-onchain.config';
 import { OnchainIndexerService } from './onchain-indexer.service';
 
 describe('OnchainIndexerService', () => {
@@ -34,13 +34,11 @@ describe('OnchainIndexerService', () => {
         { provide: SchedulerRegistry, useValue: schedulerMock },
         { provide: PrismaService, useValue: prismaMock },
         {
-          provide: workerCfg.KEY,
+          provide: workerOnchainCfg.KEY,
           useValue: {
-            onchain: {
-              enabled,
-              syncIntervalMs: 10_000,
-              maxChainsPerTick: 10,
-            },
+            enabled,
+            syncIntervalMs: 10_000,
+            maxChainsPerTick: 10,
           },
         },
       ],

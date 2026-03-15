@@ -42,12 +42,33 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:password@postgres:5432/nexus
       YELLOW_API_URL: wss://clearnet.yellow.com/ws
+      OFFCHAIN_SYNC_ENABLED: "true"
+      ONCHAIN_INDEXER_ENABLED: "false"
       NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'node dist/src/worker.js' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  worker-onchain:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.onchain
+    environment:
+      DATABASE_URL: postgresql://nexus:password@postgres:5432/nexus
+      OFFCHAIN_SYNC_ENABLED: "false"
+      ONCHAIN_INDEXER_ENABLED: "true"
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node dist/src/worker-onchain.js' > /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -25,6 +25,7 @@ export type EnvVars = {
   SYNC_APP_SESSIONS_REFRESH_MS: number;
   SYNC_TXS_PAGE_SIZE: number;
   SYNC_TXS_BUDGET_MS: number;
+  OFFCHAIN_SYNC_ENABLED: string;
   ONCHAIN_INDEXER_ENABLED: string;
   ONCHAIN_SYNC_INTERVAL_MS: number;
   ONCHAIN_MAX_CHAINS_PER_TICK: number;
@@ -46,7 +47,11 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
 
   YELLOW_API_URL: Joi.string()
     .uri({ scheme: ['ws', 'wss'] })
-    .required(),
+    .when('OFFCHAIN_SYNC_ENABLED', {
+      is: 'true',
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
   YELLOW_WS_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).default(90_000),
   YELLOW_WS_RECONNECT_BASE_MS: Joi.number().integer().min(100).default(1_000),
   YELLOW_WS_RECONNECT_MAX_MS: Joi.number().integer().min(1_000).default(60_000),
@@ -71,6 +76,7 @@ export const envValidationSchema: Joi.ObjectSchema<EnvVars> = Joi.object<EnvVars
     .default(5 * 60 * 1000),
   SYNC_TXS_PAGE_SIZE: Joi.number().integer().min(50).max(1000).default(200),
   SYNC_TXS_BUDGET_MS: Joi.number().integer().min(1000).default(10_000),
+  OFFCHAIN_SYNC_ENABLED: Joi.string().valid('true', 'false').default('true'),
   ONCHAIN_INDEXER_ENABLED: Joi.string().valid('true', 'false').default('false'),
   ONCHAIN_SYNC_INTERVAL_MS: Joi.number().integer().min(5_000).default(30_000),
   ONCHAIN_MAX_CHAINS_PER_TICK: Joi.number().integer().min(1).max(100).default(10),

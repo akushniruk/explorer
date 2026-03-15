@@ -1,6 +1,6 @@
-# ARC001 - Split Documentation
+# ARC0001 - Architecture
 
-This folder contains the ARC001 architecture split into logical files.
+This folder contains the ARC0001 architecture split into logical files.
 
 - `01-summary-and-constraints.md`
 - `02-external-interfaces.md`

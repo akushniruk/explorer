@@ -14,6 +14,13 @@
       "entryFile": "worker",
       "sourceRoot": "src",
       "compilerOptions": { "deleteOutDir": false }
+    },
+    "worker-onchain": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "worker-onchain",
+      "sourceRoot": "src",
+      "compilerOptions": { "deleteOutDir": false }
     }
   }
 }

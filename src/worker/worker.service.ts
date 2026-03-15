@@ -38,6 +38,12 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    if (!this.cfg.offchain?.enabled) {
+      this.logger.log('Offchain sync worker disabled (OFFCHAIN_SYNC_ENABLED=false)');
+
+      return;
+    }
+
     // Ensure WS is open before first upstream calls
     try {
       await this.yellowApiService.waitUntilOpen(this.cfg.wsRequestTimeoutMs ?? 5_000);

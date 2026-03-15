@@ -14,7 +14,6 @@ import { HealthService } from './health/health.service';
 import { AppSessionService } from './app-session/app-session.service';
 import { CacheService } from '../common/cache';
 import { cacheConfig } from '../config/cache.config';
-import { OnchainIndexerService } from './onchain/onchain-indexer.service';
 
 @Module({
   imports: [
@@ -43,7 +42,6 @@ import { OnchainIndexerService } from './onchain/onchain-indexer.service';
     NodeConfigService,
     AppSessionService,
     CacheService,
-    OnchainIndexerService,
   ],
 })
 export class WorkerModule {}
